@@ -7,118 +7,296 @@
 
 <style>
 body{
-    margin:0;
-    font-family: Arial, sans-serif;
-    background:#000;
-    color:#fff;
+margin:0;
+font-family:Arial;
+background:#000;
+color:#fff;
+}
+
+/* TEXTO RGB */
+@keyframes rgbText{
+0%{color:red;}
+25%{color:blue;}
+50%{color:white;}
+75%{color:magenta;}
+100%{color:red;}
 }
 
 /* HEADER */
-.header{
-    text-align:center;
-    padding:20px;
+.header{text-align:center;padding:20px;}
+.header h1{animation:rgbText 5s infinite linear;}
+
+/* FOTO */
+.creador{text-align:center;margin:20px;}
+.creador img{
+width:90%;
+max-width:400px;
+border-radius:15px;
+padding:4px;
+background:linear-gradient(45deg, red, blue, white, magenta);
+background-size:300% 300%;
+animation:bordeRGB 4s linear infinite;
+}
+@keyframes bordeRGB{
+0%{background-position:0% 50%;}
+50%{background-position:100% 50%;}
+100%{background-position:0% 50%;}
+}
+.creador p{
+animation:rgbText 5s infinite linear;
+font-weight:bold;
 }
 
-.header h1{
-    color:#00ff88;
-    font-size:26px;
-    text-shadow:0 0 10px #00ff88;
+/* BUSCADOR */
+.search{
+padding:12px;
+width:90%;
+margin:10px auto;
+display:block;
+border-radius:10px;
+border:none;
+background:#111;
+color:#fff;
 }
 
-/* BANNER */
-.banner{
-    width:100%;
-    height:300px;
-    background: url('https://i.imgur.com/jJwW8vt.jpeg') center/cover no-repeat;
-    border-bottom: 2px solid #00ff88;
-    box-shadow: 0 0 20px #00ff88;
-}
-
-/* CONTENEDOR */
-.container{
-    padding:15px;
-}
-
-/* CARD */
+/* CARDS */
+.container{padding:15px;}
 .card{
-    background:#111;
-    border-radius:15px;
-    padding:15px;
-    margin-bottom:20px;
-    box-shadow:0 0 10px #00ff88;
-    transition:0.3s;
+background:#111;
+padding:15px;
+border-radius:15px;
+margin-bottom:15px;
+box-shadow:0 0 10px red;
+transition:0.3s;
 }
-
 .card:hover{
-    transform:scale(1.02);
-    box-shadow:0 0 20px #00ff88;
+transform:scale(1.02);
+box-shadow:0 0 25px red;
 }
-
 .card img{
-    width:100%;
-    border-radius:10px;
+width:100%;
+border-radius:10px;
+margin-bottom:10px;
 }
 
-.card h2{
-    margin:10px 0;
-    color:#00ff88;
-}
-
-/* BOTON */
+/* BOTONES */
 .btn{
-    display:block;
-    text-align:center;
-    padding:12px;
-    border-radius:10px;
-    background:linear-gradient(45deg,#00ff88,#00cc66);
-    color:#000;
-    font-weight:bold;
-    text-decoration:none;
-    transition:0.3s;
-    box-shadow:0 0 10px #00ff88;
+background:red;
+color:#000;
+padding:12px;
+margin-top:10px;
+text-align:center;
+border-radius:10px;
+cursor:pointer;
+font-weight:bold;
+transition:0.3s;
+}
+.btn:hover{
+background:#ff3333;
+box-shadow:0 0 15px red;
 }
 
-.btn:hover{
-    background:linear-gradient(45deg,#00cc66,#00ff88);
-    box-shadow:0 0 10px #00ff88;
-    transform:scale(1.05);
+/* LOGIN MODAL */
+#loginModal{
+display:none;
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.8);
+justify-content:center;
+align-items:center;
+}
+
+.login-box{
+background:#111;
+padding:20px;
+border-radius:15px;
+text-align:center;
+width:80%;
+max-width:300px;
+border:2px solid;
+animation:rgbBorder 4s infinite linear;
+}
+
+.login-box h3{
+animation:rgbText 5s infinite linear;
+}
+
+.login-box input{
+width:90%;
+padding:10px;
+margin-top:10px;
+border-radius:10px;
+border:none;
+background:#000;
+color:#fff;
+text-align:center;
+}
+
+/* INPUTS PRO */
+.input-box{
+position:relative;
+margin-top:15px;
+padding:2px;
+border-radius:12px;
+background:linear-gradient(45deg, red, blue, white, magenta, red);
+background-size:300% 300%;
+animation:rgbBorder 4s linear infinite;
+}
+
+.input-box input{
+width:100%;
+padding:12px;
+border-radius:10px;
+border:none;
+background:#000;
+color:#fff;
+outline:none;
+}
+
+@keyframes rgbBorder{
+0%{background-position:0% 50%;}
+50%{background-position:100% 50%;}
+100%{background-position:0% 50%;}
+}
+
+/* PANEL ADMIN */
+#adminPanel{
+display:none;
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:#000;
+padding:20px;
+overflow:auto;
 }
 </style>
 </head>
 
 <body>
 
-<!-- TITULO ARRIBA -->
 <div class="header">
-    <h1>ZONA DE DESCARGAS DE ALBERT OFICIAL</h1>
+<h1>ZONA DE DESCARGA DE ALBERT OFICIAL</h1>
 </div>
 
-<!-- IMAGEN DESPUES DEL TITULO -->
-<div class="banner"></div>
-
-<div class="container"
-    <!-- ARCHIVO 1 -->
-    <div class="card">
-        <img src="https://i.imgur.com/iESVSzS.png">
-        <h2>HOLOGRAMA NEGRO VIP 
-        <a href="https://www.mediafire.com/file/esvbz0z013a5foh/HOLOGRAMA_NEGRO_%252B_HOLO_ARMAS_%252B_PARED_TRANSPARENTE_SEGURO_%25F0%259F%2594%2590.zip/file" class="btn">DESCARGAR</a>
-    </div>
-
-    <!-- ARCHIVO 2 -->
-    <div class="card">
-        <img src="https://i.imgur.com/jJwW8vt.jpeg">
-        <h2>ARCHIVO NO ENCONTRADO</h2>
-        <a href="#" class="btn">DESCARGAR</a>
-    </div>
-
-    <!-- ARCHIVO 3 -->
-    <div class="card">
-        <img src="https://i.imgur.com/jJwW8vt.jpeg">
-        <h2>ARCHIVO NO EN CONTRADO</h2>
-        <a href="#" class="btn">DESCARGAR</a>
-    </div>
-
+<div class="creador">
+<img src="https://i.imgur.com/jJwW8vt.jpeg">
+<p>ALBERT OFICIAL CREADOR</p>
 </div>
+
+<input class="search" placeholder="Buscar..." onkeyup="buscar(this.value)">
+
+<div class="container" id="lista"></div>
+
+<div class="btn" onclick="abrirLogin()">ACESSO ADMIN</div>
+
+<!-- LOGIN -->
+<div id="loginModal">
+<div class="login-box">
+<h3>🔐 Acceso Admin</h3>
+<input type="password" id="clave" placeholder="Ingresa clave">
+<div class="btn" onclick="verificar()">ENTRAR</div>
+<div class="btn" onclick="cerrarLogin()">CANCELAR</div>
+</div>
+</div>
+
+<!-- PANEL ADMIN -->
+<div id="adminPanel">
+<h2>ALBERT OFICIAL</h2>
+
+<div class="input-box">
+<input id="nombre" placeholder="Nombre del archivo">
+</div>
+
+<div class="input-box">
+<input id="link" placeholder="Link de descarga">
+</div>
+
+<div class="input-box">
+<input id="imagen" placeholder="URL de la imagen">
+</div>
+
+<div class="btn" onclick="agregar()">AGREGAR</div>
+<div class="btn" onclick="cerrar()">CERRAR</div>
+
+<div id="adminLista"></div>
+</div>
+
+<script>
+let archivos = JSON.parse(localStorage.getItem("archivos")) || [];
+
+function render(){
+let html="";
+archivos.forEach((a,i)=>{
+html+=`
+<div class="card">
+<img src="${a.imagen}">
+<h2>${a.nombre}</h2>
+<div class="btn" onclick="descargar(${i})">DESCARGAR</div>
+</div>
+`;
+});
+document.getElementById("lista").innerHTML=html;
+}
+render();
+
+function descargar(i){
+window.location.href = archivos[i].link;
+}
+
+function buscar(text){
+let filtrados = archivos.filter(a=>a.nombre.toLowerCase().includes(text.toLowerCase()));
+let html="";
+filtrados.forEach((a)=>{
+html+=`
+<div class="card">
+<img src="${a.imagen}">
+<h2>${a.nombre}</h2>
+<div class="btn" onclick="window.location.href='${a.link}'">DESCARGAR</div>
+</div>
+`;
+});
+document.getElementById("lista").innerHTML=html;
+}
+
+/* LOGIN */
+function abrirLogin(){
+document.getElementById("loginModal").style.display="flex";
+}
+
+function cerrarLogin(){
+document.getElementById("loginModal").style.display="none";
+}
+
+function verificar(){
+let pass=document.getElementById("clave").value;
+if(pass==="2927"){
+cerrarLogin();
+document.getElementById("adminPanel").style.display="block";
+}else{
+alert("Clave incorrecta");
+}
+}
+
+/* ADMIN */
+function agregar(){
+let n=nombre.value;
+let l=link.value;
+let img=imagen.value;
+
+archivos.push({nombre:n,link:l,imagen:img});
+localStorage.setItem("archivos",JSON.stringify(archivos));
+render();
+}
+
+function cerrar(){
+document.getElementById("adminPanel").style.display="none";
+}
+</script>
 
 </body>
 </html>
