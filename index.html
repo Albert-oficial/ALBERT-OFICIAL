@@ -6,20 +6,10 @@
 <title>ZONA DE DESCARGA DE ALBERT OFICIAL</title>
 
 <style>
-body{
-margin:0;
-font-family:Arial;
-background:#000;
-color:#fff;
-}
+body{margin:0;font-family:Arial;background:#000;color:#fff;overflow-x:hidden;}
 
-/* ANIMACIONES */
 @keyframes rgbText{
-0%{color:red;}
-25%{color:blue;}
-50%{color:white;}
-75%{color:magenta;}
-100%{color:red;}
+0%{color:red;}25%{color:blue;}50%{color:white;}75%{color:magenta;}100%{color:red;}
 }
 
 @keyframes rgbBorder{
@@ -28,231 +18,89 @@ color:#fff;
 100%{background-position:0% 50%;}
 }
 
-@keyframes zoomIn{
-from{transform:scale(0.7);opacity:0;}
-to{transform:scale(1);opacity:1;}
+/* 🌠 METEORITOS */
+.meteor{
+position:fixed;
+top:-50px;
+width:3px;
+height:100px;
+background:linear-gradient(white, transparent);
+opacity:0.8;
+transform:rotate(45deg);
+animation:caer linear infinite;
 }
 
-/* HEADER */
+@keyframes caer{
+0%{transform:translateY(0) translateX(0) rotate(45deg);}
+100%{transform:translateY(100vh) translateX(200px) rotate(45deg);}
+}
+
 .header{text-align:center;padding:20px;}
 .header h1{animation:rgbText 5s infinite linear;}
 
-/* CREATOR */
 .creador{text-align:center;margin:20px;}
 .creador img{
-width:90%;
-max-width:400px;
-border-radius:15px;
-padding:4px;
+width:90%;max-width:400px;border-radius:15px;padding:4px;
+background:linear-gradient(45deg, red, blue, white, magenta);
+background-size:300% 300%;animation:rgbBorder 4s linear infinite;
+}
+
+.creador p{animation:rgbText 5s infinite linear;font-weight:bold;}
+
+.search{
+padding:12px;width:90%;margin:10px auto;display:block;
+border-radius:10px;border:none;background:#111;color:#fff;
+}
+
+.container{padding:15px;}
+
+.card{
+background:#111;padding:15px;border-radius:15px;margin-bottom:15px;
+box-shadow:0 0 15px red;transition:0.3s;
+}
+.card:hover{transform:scale(1.03);box-shadow:0 0 35px red;}
+
+/* IMAGEN RGB */
+.img-rgb{
+padding:4px;border-radius:10px;
 background:linear-gradient(45deg, red, blue, white, magenta);
 background-size:300% 300%;
 animation:rgbBorder 4s linear infinite;
-}
-
-.creador p{
-animation:rgbText 5s infinite linear;
-font-weight:bold;
-}
-
-/* BUSCADOR */
-.search{
-padding:12px;
-width:90%;
-margin:10px auto;
-display:block;
-border-radius:10px;
-border:none;
-background:#111;
-color:#fff;
-}
-
-/* CARDS */
-.container{padding:15px;}
-.card{
-background:#111;
-padding:15px;
-border-radius:15px;
-margin-bottom:15px;
-box-shadow:0 0 10px red;
-transition:0.3s;
-}
-.card:hover{
-transform:scale(1.02);
-box-shadow:0 0 25px red;
-}
-.card img{
-width:100%;
-border-radius:10px;
 margin-bottom:10px;
 }
+.img-rgb img{width:100%;border-radius:8px;}
 
-/* BOTONES */
+/* TEXTO */
+.nombre-rgb{
+animation:rgbText 4s infinite linear;
+text-align:center;
+}
+
+.fecha,.contador{
+text-align:center;
+font-size:14px;
+animation:rgbText 6s infinite linear;
+}
+
+/* BOTÓN */
 .btn{
-background:red;
-color:#000;
-padding:12px;
-margin-top:10px;
-text-align:center;
-border-radius:10px;
-cursor:pointer;
-font-weight:bold;
-transition:0.3s;
-}
-.btn:hover{
-background:#ff3333;
-box-shadow:0 0 15px red;
-}
-
-/* LOGIN */
-#loginModal{
-display:none;
-position:fixed;
-top:0;
-left:0;
-width:100%;
-height:100%;
-background:rgba(0,0,0,0.8);
-justify-content:center;
-align-items:center;
-}
-
-.login-box{
-background:#0a0a0a;
-padding:25px;
-border-radius:20px;
-text-align:center;
-width:85%;
-max-width:320px;
-}
-
-.input-box{
-position:relative;
-margin-top:15px;
-border-radius:15px;
-overflow:hidden;
-}
-
-.input-box::before{
-content:"";
-position:absolute;
-top:0;
-left:0;
-right:0;
-bottom:0;
-background:linear-gradient(45deg, red, blue, white, magenta, red);
-background-size:400% 400%;
-animation:rgbBorder 3s linear infinite;
-}
-
-.input-box::after{
-content:"";
-position:absolute;
-top:2px;
-left:2px;
-right:2px;
-bottom:2px;
-background:#000;
-border-radius:13px;
-}
-
-.input-box input{
-position:relative;
-z-index:2;
-width:100%;
-padding:14px;
-border:none;
-background:transparent;
-color:#fff;
-outline:none;
-box-sizing:border-box;
-text-align:center;
-}
-
-/* PANEL ADMIN */
-#adminPanel{
-display:none;
-position:fixed;
-top:0;
-left:0;
-width:100%;
-height:100%;
-background:#000;
-justify-content:center;
-align-items:center;
-}
-
-.admin-box{
-width:90%;
-max-width:400px;
-background:#0a0a0a;
-padding:20px;
-border-radius:20px;
-box-shadow:0 0 25px red;
-}
-
-/* ALERTA */
-.alerta{
-position:fixed;
-bottom:20px;
-left:50%;
-transform:translateX(-50%);
-background:#0a0a0a;
-padding:15px 25px;
-border-radius:15px;
-display:none;
-box-shadow:0 0 20px red;
-}
-
-/* 🔥 NUEVO CONFIRM PRO */
-.confirmBox{
-display:none;
-position:fixed;
-top:0;
-left:0;
-width:100%;
-height:100%;
-background:rgba(0,0,0,0.8);
-justify-content:center;
-align-items:center;
-z-index:9999;
-}
-
-.confirmContent{
-width:85%;
-max-width:320px;
-padding:25px;
-border-radius:20px;
-text-align:center;
-color:#fff;
-background:#0a0a0a;
-position:relative;
-overflow:hidden;
-animation:zoomIn 0.3s ease;
-}
-
-.confirmContent::before{
-content:"";
-position:absolute;
-top:-2px;
-left:-2px;
-right:-2px;
-bottom:-2px;
-background:linear-gradient(45deg, red, blue, white, magenta, red);
-background-size:400% 400%;
+padding:12px;margin-top:10px;text-align:center;
+border-radius:10px;cursor:pointer;font-weight:bold;
+background:linear-gradient(45deg, red, blue, white, magenta);
+background-size:300% 300%;
 animation:rgbBorder 4s linear infinite;
-z-index:-1;
-border-radius:22px;
-}
-
-.confirmBtns{
-display:flex;
-gap:10px;
-margin-top:20px;
+color:#000;
 }
 </style>
 </head>
 
 <body>
+
+<!-- 🌠 METEORITOS -->
+<div class="meteor" style="left:10%;animation-duration:3s;"></div>
+<div class="meteor" style="left:30%;animation-duration:5s;"></div>
+<div class="meteor" style="left:60%;animation-duration:4s;"></div>
+<div class="meteor" style="left:80%;animation-duration:6s;"></div>
 
 <div class="header">
 <h1>ZONA DE DESCARGA DE ALBERT OFICIAL</h1>
@@ -264,189 +112,80 @@ margin-top:20px;
 </div>
 
 <input class="search" placeholder="Buscar..." onkeyup="buscar(this.value)">
-
 <div class="container" id="lista"></div>
 
-<div class="btn" onclick="abrirLogin()">🔐 ADMIN</div>
-
-<!-- LOGIN -->
-<div id="loginModal">
-<div class="login-box">
-<h3>🔐 Acceso Admin</h3>
-
-<div class="input-box">
-<input type="password" id="clave" placeholder="Ingresa clave">
-</div>
-
-<div class="btn" onclick="verificar()">ENTRAR</div>
-<div class="btn" onclick="cerrarLogin()">CANCELAR</div>
-</div>
-</div>
-
-<!-- PANEL ADMIN -->
-<div id="adminPanel">
-<div class="admin-box">
-
-<h2>ALBERT OFICIAL</h2>
-
-<div class="input-box">
-<input id="nombre" placeholder="Nombre del archivo">
-</div>
-
-<div class="input-box">
-<input id="link" placeholder="Link de descarga">
-</div>
-
-<div class="input-box">
-<input id="imagen" placeholder="URL de la imagen">
-</div>
-
-<div class="btn" onclick="agregar()">AGREGAR</div>
-<div class="btn" onclick="cerrar()">CERRAR</div>
-
-<h3>Archivos Subidos</h3>
-<div id="adminLista"></div>
-
-</div>
-</div>
-
-<!-- ALERTA -->
-<div id="alerta" class="alerta">
-<p id="alertaTexto"></p>
-</div>
-
-<!-- 🔥 CONFIRM PRO -->
-<div id="confirmBox" class="confirmBox">
-  <div class="confirmContent">
-    <p id="confirmTexto">¿Eliminar este archivo?</p>
-    <div class="confirmBtns">
-      <div class="btn" onclick="cancelarEliminar()">CANCELAR</div>
-      <div class="btn" onclick="confirmarEliminar()">ACEPTAR</div>
-    </div>
-  </div>
-</div>
-
 <script>
-let archivos = JSON.parse(localStorage.getItem("archivos")) || [];
 
-function render(){
+/* 🔥 DATOS BASE (SIEMPRE CARGAN) */
+let baseArchivos = [
+{
+nombre:"HOLOGRAMA NEGRO VIP",
+link:"https://www.mediafire.com/file/esvbz0z013a5foh/HOLOGRAMA_NEGRO_%252B_HOLO_ARMAS_%252B_PARED_TRANSPARENTE_SEGURO_%25F0%259F%2594%2590.zip/file",
+imagen:"https://i.imgur.com/iESVSzS.png",
+fecha:"24/03/2026",
+descargas:0
+},
+{
+nombre:"ARCHIVO NO ENCONTRADO ",
+link:"https://example.com",
+imagen:"https://i.imgur.com/jJwW8vt.jpeg",
+fecha:"O0/03/2026",
+descargas:0
+}
+];
+
+/* 🔥 CARGA SEGURA */
+let archivos = JSON.parse(localStorage.getItem("archivos"));
+
+if(!archivos || archivos.length === 0){
+archivos = baseArchivos;
+guardar();
+}
+
+/* GUARDAR */
+function guardar(){
+localStorage.setItem("archivos", JSON.stringify(archivos));
+}
+
+/* RENDER */
+function render(lista = archivos){
 let html="";
-archivos.forEach((a,i)=>{
+lista.forEach((a,i)=>{
 html+=`
 <div class="card">
+
+<div class="img-rgb">
 <img src="${a.imagen}">
-<h2>${a.nombre}</h2>
-<div class="btn" onclick="descargar(${i})">DESCARGAR</div>
 </div>
-`;
+
+<h2 class="nombre-rgb">${a.nombre}</h2>
+<div class="fecha">📅 ${a.fecha}</div>
+<div class="contador">⬇️ ${a.descargas} descargas</div>
+
+<div class="btn" onclick="descargar(${i})">DESCARGAR</div>
+
+</div>`;
 });
-document.getElementById("lista").innerHTML=html;
+document.getElementById("lista").innerHTML = html;
 }
 render();
 
+/* DESCARGAR */
 function descargar(i){
+archivos[i].descargas++;
+guardar();
+render();
 window.location.href = archivos[i].link;
 }
 
+/* BUSCAR */
 function buscar(text){
-let filtrados = archivos.filter(a=>a.nombre.toLowerCase().includes(text.toLowerCase()));
-let html="";
-filtrados.forEach((a)=>{
-html+=`
-<div class="card">
-<img src="${a.imagen}">
-<h2>${a.nombre}</h2>
-<div class="btn" onclick="window.location.href='${a.link}'">DESCARGAR</div>
-</div>
-`;
-});
-document.getElementById("lista").innerHTML=html;
+let filtrados = archivos.filter(a=>
+a.nombre.toLowerCase().includes(text.toLowerCase())
+);
+render(filtrados);
 }
 
-/* LOGIN */
-function abrirLogin(){
-document.getElementById("loginModal").style.display="flex";
-}
-
-function cerrarLogin(){
-document.getElementById("loginModal").style.display="none";
-}
-
-function verificar(){
-let pass=document.getElementById("clave");
-
-if(pass.value==="2927"){
-cerrarLogin();
-document.getElementById("adminPanel").style.display="flex";
-adminRender();
-}else{
-mostrarAlerta("❌ Clave incorrecta");
-}
-}
-
-/* ALERTA */
-function mostrarAlerta(texto){
-let alerta=document.getElementById("alerta");
-let textoBox=document.getElementById("alertaTexto");
-
-textoBox.innerText=texto;
-alerta.style.display="block";
-
-setTimeout(()=>{
-alerta.style.display="none";
-},3000);
-}
-
-/* 🔥 NUEVO SISTEMA ELIMINAR */
-let indexEliminar = null;
-
-function eliminar(index){
-indexEliminar = index;
-document.getElementById("confirmBox").style.display = "flex";
-}
-
-function confirmarEliminar(){
-if(indexEliminar !== null){
-archivos.splice(indexEliminar,1);
-localStorage.setItem("archivos",JSON.stringify(archivos));
-render();
-adminRender();
-}
-document.getElementById("confirmBox").style.display = "none";
-}
-
-function cancelarEliminar(){
-document.getElementById("confirmBox").style.display = "none";
-}
-
-/* ADMIN */
-function agregar(){
-let n=nombre.value;
-let l=link.value;
-let img=imagen.value;
-
-archivos.push({nombre:n,link:l,imagen:img});
-localStorage.setItem("archivos",JSON.stringify(archivos));
-render();
-adminRender();
-}
-
-function adminRender(){
-let html="";
-archivos.forEach((a,i)=>{
-html+=`
-<div class="card">
-<h3>${a.nombre}</h3>
-<div class="btn" onclick="eliminar(${i})">🗑️ ELIMINAR</div>
-</div>
-`;
-});
-document.getElementById("adminLista").innerHTML=html;
-}
-
-function cerrar(){
-document.getElementById("adminPanel").style.display="none";
-}
 </script>
 
 </body>
