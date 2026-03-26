@@ -13,7 +13,7 @@ background:#000;
 color:#fff;
 }
 
-/* TEXTO RGB */
+/* ANIMACIONES */
 @keyframes rgbText{
 0%{color:red;}
 25%{color:blue;}
@@ -22,18 +22,22 @@ color:#fff;
 100%{color:red;}
 }
 
-/* BORDE RGB */
 @keyframes rgbBorder{
 0%{background-position:0% 50%;}
 50%{background-position:100% 50%;}
 100%{background-position:0% 50%;}
 }
 
+@keyframes zoomIn{
+from{transform:scale(0.7);opacity:0;}
+to{transform:scale(1);opacity:1;}
+}
+
 /* HEADER */
 .header{text-align:center;padding:20px;}
 .header h1{animation:rgbText 5s infinite linear;}
 
-/* FOTO */
+/* CREATOR */
 .creador{text-align:center;margin:20px;}
 .creador img{
 width:90%;
@@ -121,7 +125,6 @@ width:85%;
 max-width:320px;
 }
 
-/* INPUT RGB */
 .input-box{
 position:relative;
 margin-top:15px;
@@ -163,25 +166,6 @@ color:#fff;
 outline:none;
 box-sizing:border-box;
 text-align:center;
-letter-spacing:2px;
-}
-
-/* EFECTO FOCUS */
-.input-box input:focus{
-box-shadow:0 0 10px red, 0 0 20px blue, 0 0 30px magenta;
-}
-
-/* ERROR SHAKE */
-@keyframes shake{
-0%{transform:translateX(0);}
-25%{transform:translateX(-5px);}
-50%{transform:translateX(5px);}
-75%{transform:translateX(-5px);}
-100%{transform:translateX(0);}
-}
-
-.error{
-animation:shake 0.3s;
 }
 
 /* PANEL ADMIN */
@@ -193,7 +177,6 @@ left:0;
 width:100%;
 height:100%;
 background:#000;
-display:flex;
 justify-content:center;
 align-items:center;
 }
@@ -218,21 +201,54 @@ padding:15px 25px;
 border-radius:15px;
 display:none;
 box-shadow:0 0 20px red;
-border:2px solid transparent;
-background-image:linear-gradient(#0a0a0a,#0a0a0a), 
-linear-gradient(45deg, red, blue, magenta);
-background-origin:border-box;
-background-clip:padding-box, border-box;
-animation:rgbBorder 3s linear infinite;
-z-index:999;
 }
 
-.alerta p{
-margin:0;
-font-weight:bold;
+/* 🔥 NUEVO CONFIRM PRO */
+.confirmBox{
+display:none;
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.8);
+justify-content:center;
+align-items:center;
+z-index:9999;
 }
 
-/* ANIMACIÓN */
+.confirmContent{
+width:85%;
+max-width:320px;
+padding:25px;
+border-radius:20px;
+text-align:center;
+color:#fff;
+background:#0a0a0a;
+position:relative;
+overflow:hidden;
+animation:zoomIn 0.3s ease;
+}
+
+.confirmContent::before{
+content:"";
+position:absolute;
+top:-2px;
+left:-2px;
+right:-2px;
+bottom:-2px;
+background:linear-gradient(45deg, red, blue, white, magenta, red);
+background-size:400% 400%;
+animation:rgbBorder 4s linear infinite;
+z-index:-1;
+border-radius:22px;
+}
+
+.confirmBtns{
+display:flex;
+gap:10px;
+margin-top:20px;
+}
 </style>
 </head>
 
@@ -299,6 +315,17 @@ font-weight:bold;
 <p id="alertaTexto"></p>
 </div>
 
+<!-- 🔥 CONFIRM PRO -->
+<div id="confirmBox" class="confirmBox">
+  <div class="confirmContent">
+    <p id="confirmTexto">¿Eliminar este archivo?</p>
+    <div class="confirmBtns">
+      <div class="btn" onclick="cancelarEliminar()">CANCELAR</div>
+      <div class="btn" onclick="confirmarEliminar()">ACEPTAR</div>
+    </div>
+  </div>
+</div>
+
 <script>
 let archivos = JSON.parse(localStorage.getItem("archivos")) || [];
 
@@ -354,10 +381,6 @@ document.getElementById("adminPanel").style.display="flex";
 adminRender();
 }else{
 mostrarAlerta("❌ Clave incorrecta");
-
-// EFECTO SHAKE
-pass.classList.add("error");
-setTimeout(()=>{pass.classList.remove("error");},300);
 }
 }
 
@@ -374,6 +397,28 @@ alerta.style.display="none";
 },3000);
 }
 
+/* 🔥 NUEVO SISTEMA ELIMINAR */
+let indexEliminar = null;
+
+function eliminar(index){
+indexEliminar = index;
+document.getElementById("confirmBox").style.display = "flex";
+}
+
+function confirmarEliminar(){
+if(indexEliminar !== null){
+archivos.splice(indexEliminar,1);
+localStorage.setItem("archivos",JSON.stringify(archivos));
+render();
+adminRender();
+}
+document.getElementById("confirmBox").style.display = "none";
+}
+
+function cancelarEliminar(){
+document.getElementById("confirmBox").style.display = "none";
+}
+
 /* ADMIN */
 function agregar(){
 let n=nombre.value;
@@ -384,15 +429,6 @@ archivos.push({nombre:n,link:l,imagen:img});
 localStorage.setItem("archivos",JSON.stringify(archivos));
 render();
 adminRender();
-}
-
-function eliminar(index){
-if(confirm("¿Eliminar este archivo?")){
-archivos.splice(index,1);
-localStorage.setItem("archivos",JSON.stringify(archivos));
-render();
-adminRender();
-}
 }
 
 function adminRender(){
