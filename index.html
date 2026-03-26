@@ -6,19 +6,25 @@
 <title>ZONA DE DESCARGA DE ALBERT OFICIAL</title>
 
 <style>
-body{margin:0;font-family:Arial;background:#000;color:#fff;overflow-x:hidden;}
+*{box-sizing:border-box;margin:0;padding:0;}
+
+body{
+font-family:Arial;
+background:#000;
+color:#fff;
+overflow-x:hidden;
+}
 
 @keyframes rgbText{
 0%{color:red;}25%{color:blue;}50%{color:white;}75%{color:magenta;}100%{color:red;}
 }
-
 @keyframes rgbBorder{
 0%{background-position:0% 50%;}
 50%{background-position:100% 50%;}
 100%{background-position:0% 50%;}
 }
 
-/* 🌠 METEORITOS */
+/* METEOROS */
 .meteor{
 position:fixed;
 top:-50px;
@@ -29,7 +35,6 @@ opacity:0.8;
 transform:rotate(45deg);
 animation:caer linear infinite;
 }
-
 @keyframes caer{
 0%{transform:translateY(0) translateX(0) rotate(45deg);}
 100%{transform:translateY(100vh) translateX(200px) rotate(45deg);}
@@ -40,37 +45,60 @@ animation:caer linear infinite;
 
 .creador{text-align:center;margin:20px;}
 .creador img{
-width:90%;max-width:400px;border-radius:15px;padding:4px;
+width:90%;
+max-width:400px;
+border-radius:15px;
+padding:4px;
 background:linear-gradient(45deg, red, blue, white, magenta);
-background-size:300% 300%;animation:rgbBorder 4s linear infinite;
+background-size:300% 300%;
+animation:rgbBorder 4s linear infinite;
 }
 
-.creador p{animation:rgbText 5s infinite linear;font-weight:bold;}
+.creador p{
+animation:rgbText 5s infinite linear;
+font-weight:bold;
+}
 
 .search{
-padding:12px;width:90%;margin:10px auto;display:block;
-border-radius:10px;border:none;background:#111;color:#fff;
+padding:12px;
+width:90%;
+margin:10px auto;
+display:block;
+border-radius:10px;
+border:none;
+background:#111;
+color:#fff;
+font-size:16px;
 }
 
 .container{padding:15px;}
 
 .card{
-background:#111;padding:15px;border-radius:15px;margin-bottom:15px;
-box-shadow:0 0 15px red;transition:0.3s;
+background:#111;
+padding:15px;
+border-radius:15px;
+margin-bottom:15px;
+box-shadow:0 0 15px red;
+transition:0.3s;
 }
-.card:hover{transform:scale(1.03);box-shadow:0 0 35px red;}
+.card:hover{
+transform:scale(1.03);
+box-shadow:0 0 35px red;
+}
 
-/* IMAGEN RGB */
 .img-rgb{
-padding:4px;border-radius:10px;
+padding:4px;
+border-radius:10px;
 background:linear-gradient(45deg, red, blue, white, magenta);
 background-size:300% 300%;
 animation:rgbBorder 4s linear infinite;
 margin-bottom:10px;
 }
-.img-rgb img{width:100%;border-radius:8px;}
+.img-rgb img{
+width:100%;
+border-radius:8px;
+}
 
-/* TEXTO */
 .nombre-rgb{
 animation:rgbText 4s infinite linear;
 text-align:center;
@@ -82,10 +110,13 @@ font-size:14px;
 animation:rgbText 6s infinite linear;
 }
 
-/* BOTÓN */
 .btn{
-padding:12px;margin-top:10px;text-align:center;
-border-radius:10px;cursor:pointer;font-weight:bold;
+padding:12px;
+margin-top:10px;
+text-align:center;
+border-radius:10px;
+cursor:pointer;
+font-weight:bold;
 background:linear-gradient(45deg, red, blue, white, magenta);
 background-size:300% 300%;
 animation:rgbBorder 4s linear infinite;
@@ -96,7 +127,6 @@ color:#000;
 
 <body>
 
-<!-- 🌠 METEORITOS -->
 <div class="meteor" style="left:10%;animation-duration:3s;"></div>
 <div class="meteor" style="left:30%;animation-duration:5s;"></div>
 <div class="meteor" style="left:60%;animation-duration:4s;"></div>
@@ -116,9 +146,15 @@ color:#000;
 
 <script>
 
-/* 🔥 DATOS BASE (SIEMPRE CARGAN) */
+/* GENERAR ID */
+function generarID(){
+return Date.now() + Math.random().toString(16).slice(2);
+}
+
+/* DATOS BASE */
 let baseArchivos = [
 {
+id:generarID(),
 nombre:"HOLOGRAMA NEGRO VIP",
 link:"https://www.mediafire.com/file/esvbz0z013a5foh/HOLOGRAMA_NEGRO_%252B_HOLO_ARMAS_%252B_PARED_TRANSPARENTE_SEGURO_%25F0%259F%2594%2590.zip/file",
 imagen:"https://i.imgur.com/iESVSzS.png",
@@ -126,61 +162,53 @@ fecha:"24/03/2026",
 descargas:0
 },
 {
-nombre:"ARCHIVO NO ENCONTRADO ",
+id:generarID(),
+nombre:"ARCHIVO NO ENCONTRADO",
 link:"https://example.com",
 imagen:"https://i.imgur.com/jJwW8vt.jpeg",
-fecha:"O0/03/2026",
+fecha:"01/03/2026",
 descargas:0
 }
 ];
 
-/* 🔥 CARGA SEGURA */
-let archivos = JSON.parse(localStorage.getItem("archivos"));
+/* LIMPIAR BUG ANTERIOR */
+localStorage.removeItem("archivos");
 
-if(!archivos || archivos.length === 0){
-archivos = baseArchivos;
-guardar();
-}
+let archivos = baseArchivos;
 
-/* GUARDAR */
 function guardar(){
 localStorage.setItem("archivos", JSON.stringify(archivos));
 }
 
-/* RENDER */
 function render(lista = archivos){
 let html="";
-lista.forEach((a,i)=>{
+lista.forEach((a)=>{
 html+=`
 <div class="card">
-
-<div class="img-rgb">
-<img src="${a.imagen}">
-</div>
-
+<div class="img-rgb"><img src="${a.imagen}"></div>
 <h2 class="nombre-rgb">${a.nombre}</h2>
 <div class="fecha">📅 ${a.fecha}</div>
 <div class="contador">⬇️ ${a.descargas} descargas</div>
-
-<div class="btn" onclick="descargar(${i})">DESCARGAR</div>
-
+<div class="btn" onclick="descargar('${a.id}')">DESCARGAR</div>
 </div>`;
 });
 document.getElementById("lista").innerHTML = html;
 }
 render();
 
-/* DESCARGAR */
-function descargar(i){
-archivos[i].descargas++;
+/* DESCARGA CORRECTA */
+function descargar(id){
+let archivo = archivos.find(a => a.id === id);
+if(archivo){
+archivo.descargas++;
 guardar();
 render();
-window.location.href = archivos[i].link;
+window.location.href = archivo.link;
+}
 }
 
-/* BUSCAR */
 function buscar(text){
-let filtrados = archivos.filter(a=>
+let filtrados = archivos.filter(a =>
 a.nombre.toLowerCase().includes(text.toLowerCase())
 );
 render(filtrados);
