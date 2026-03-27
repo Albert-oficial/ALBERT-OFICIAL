@@ -15,17 +15,23 @@ color:#fff;
 overflow-x:hidden;
 }
 
-/* ANIMACIONES */
+/* ANIMACIONES RGB SUAVES */
 @keyframes rgbText{
-0%{color:red;}25%{color:blue;}50%{color:white;}75%{color:magenta;}100%{color:red;}
+0%{color:#ff0000;}
+20%{color:#ff00ff;}
+40%{color:#00ffff;}
+60%{color:#00ff00;}
+80%{color:#ffff00;}
+100%{color:#ff0000;}
 }
+
 @keyframes rgbBorder{
 0%{background-position:0% 50%;}
 50%{background-position:100% 50%;}
 100%{background-position:0% 50%;}
 }
 
-/* METEORITOS REALISTAS */
+/* METEORITOS */
 .meteor{
 position:fixed;
 top:-100px;
@@ -57,7 +63,9 @@ box-shadow:0 0 10px white, 0 0 20px white;
 }
 
 .header{text-align:center;padding:20px;}
-.header h1{animation:rgbText 5s infinite linear;}
+.header h1{
+animation:rgbText 8s infinite linear;
+}
 
 .creador{text-align:center;margin:20px;}
 .creador img{
@@ -65,13 +73,13 @@ width:90%;
 max-width:400px;
 border-radius:15px;
 padding:4px;
-background:linear-gradient(45deg, red, blue, white, magenta);
-background-size:300% 300%;
-animation:rgbBorder 4s linear infinite;
+background:linear-gradient(45deg, red, magenta, cyan, lime, yellow);
+background-size:400% 400%;
+animation:rgbBorder 6s linear infinite;
 }
 
 .creador p{
-animation:rgbText 5s infinite linear;
+animation:rgbText 8s infinite linear;
 font-weight:bold;
 }
 
@@ -94,20 +102,20 @@ background:#111;
 padding:15px;
 border-radius:15px;
 margin-bottom:15px;
-box-shadow:0 0 15px red;
+box-shadow:0 0 15px #ff00ff;
 transition:0.3s;
 }
 .card:hover{
 transform:scale(1.03);
-box-shadow:0 0 35px red;
+box-shadow:0 0 35px #00ffff;
 }
 
 .img-rgb{
 padding:4px;
 border-radius:10px;
-background:linear-gradient(45deg, red, blue, white, magenta);
-background-size:300% 300%;
-animation:rgbBorder 4s linear infinite;
+background:linear-gradient(45deg, red, magenta, cyan, lime, yellow);
+background-size:400% 400%;
+animation:rgbBorder 6s linear infinite;
 margin-bottom:10px;
 }
 .img-rgb img{
@@ -116,14 +124,14 @@ border-radius:8px;
 }
 
 .nombre-rgb{
-animation:rgbText 4s infinite linear;
+animation:rgbText 8s infinite linear;
 text-align:center;
 }
 
-.fecha,.contador{
+.fecha{
 text-align:center;
 font-size:14px;
-animation:rgbText 6s infinite linear;
+animation:rgbText 10s infinite linear;
 }
 
 .btn{
@@ -133,9 +141,9 @@ text-align:center;
 border-radius:10px;
 cursor:pointer;
 font-weight:bold;
-background:linear-gradient(45deg, red, blue, white, magenta);
-background-size:300% 300%;
-animation:rgbBorder 4s linear infinite;
+background:linear-gradient(45deg, red, magenta, cyan, lime, yellow);
+background-size:400% 400%;
+animation:rgbBorder 6s linear infinite;
 color:#000;
 }
 </style>
@@ -163,57 +171,30 @@ for(let i=0;i<8;i++){
 const m = document.createElement("div");
 m.className = "meteor";
 m.style.left = Math.random()*100 + "%";
-m.style.animationDuration = (2 + Math.random()*4) + "s";
+m.style.animationDuration = (3 + Math.random()*4) + "s";
 m.style.animationDelay = (Math.random()*5) + "s";
 document.body.appendChild(m);
 }
 }
 crearMeteoros();
 
-/* DATOS BASE */
-const baseArchivos = [
+/* ARCHIVOS (SIN LOCALSTORAGE, SIN BUG) */
+const archivos = [
 {
 id:"file1",
 nombre:"HOLOGRAMA NEGRO VIP",
 link:"https://www.mediafire.com/file/esvbz0z013a5foh/HOLOGRAMA_NEGRO_%252B_HOLO_ARMAS_%252B_PARED_TRANSPARENTE_SEGURO_%25F0%259F%2594%2590.zip/file",
 imagen:"https://i.imgur.com/iESVSzS.png",
-fecha:"24/03/2026",
-descargas:0
+fecha:"24/03/2026"
 },
 {
 id:"file2",
 nombre:"ARCHIVO NO ENCONTRADO",
 link:"https://example.com",
 imagen:"https://i.imgur.com/jJwW8vt.jpeg",
-fecha:"01/03/2026",
-descargas:0
+fecha:"01/03/2026"
 }
 ];
-
-/* CONTROL DE VERSION (ARREGLA BUG) */
-const VERSION = "v2";
-
-let archivos;
-
-try{
-const guardado = JSON.parse(localStorage.getItem("archivos"));
-const versionGuardada = localStorage.getItem("versionArchivos");
-
-if(!guardado || versionGuardada !== VERSION){
-archivos = baseArchivos;
-localStorage.setItem("versionArchivos", VERSION);
-guardar();
-}else{
-archivos = guardado;
-}
-}catch(e){
-archivos = baseArchivos;
-}
-
-/* GUARDAR */
-function guardar(){
-localStorage.setItem("archivos", JSON.stringify(archivos));
-}
 
 /* RENDER */
 function render(lista = archivos){
@@ -226,8 +207,7 @@ html+=`
 <div class="img-rgb"><img src="${a.imagen}" loading="lazy"></div>
 <h2 class="nombre-rgb">${a.nombre}</h2>
 <div class="fecha">📅 ${a.fecha}</div>
-<div class="contador">⬇️ ${a.descargas || 0} descargas</div>
-<div class="btn" onclick="descargar('${a.id}')">DESCARGAR</div>
+<div class="btn" onclick="descargar('${a.link}')">DESCARGAR</div>
 </div>`;
 });
 
@@ -236,17 +216,10 @@ contenedor.innerHTML = html;
 render();
 
 /* DESCARGAR */
-function descargar(id){
-const archivo = archivos.find(a => a.id === id);
-if(!archivo) return;
-
-archivo.descargas = (archivo.descargas || 0) + 1;
-guardar();
-render();
-
+function descargar(link){
 setTimeout(()=>{
-window.open(archivo.link, "_blank");
-},300);
+window.open(link, "_blank");
+},200);
 }
 
 /* BUSCAR */
