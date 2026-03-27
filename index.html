@@ -15,7 +15,6 @@ color:#fff;
 overflow-x:hidden;
 }
 
-/* ANIMACIONES */
 @keyframes rgbText{
 0%{color:red;}25%{color:blue;}50%{color:white;}75%{color:magenta;}100%{color:red;}
 }
@@ -142,20 +141,20 @@ color:#000;
 <p>ALBERT OFICIAL CREADOR</p>
 </div>
 
-<input class="search" placeholder="Buscar..." oninput="buscar(this.value)">
+<input class="search" placeholder="Buscar..." onkeyup="buscar(this.value)">
 <div class="container" id="lista"></div>
 
 <script>
 
-/* ID FIJO SIN BUG */
+/* GENERAR ID */
 function generarID(){
-return 'id-' + Math.random().toString(36).substr(2,9);
+return Date.now() + Math.random().toString(16).slice(2);
 }
 
 /* DATOS BASE */
-const baseArchivos = [
+let baseArchivos = [
 {
-id:"file1",
+id:generarID(),
 nombre:"HOLOGRAMA NEGRO VIP",
 link:"https://www.mediafire.com/file/esvbz0z013a5foh/HOLOGRAMA_NEGRO_%252B_HOLO_ARMAS_%252B_PARED_TRANSPARENTE_SEGURO_%25F0%259F%2594%2590.zip/file",
 imagen:"https://i.imgur.com/iESVSzS.png",
@@ -163,7 +162,7 @@ fecha:"24/03/2026",
 descargas:0
 },
 {
-id:"file2",
+id:generarID(),
 nombre:"ARCHIVO NO ENCONTRADO",
 link:"https://example.com",
 imagen:"https://i.imgur.com/jJwW8vt.jpeg",
@@ -172,58 +171,44 @@ descargas:0
 }
 ];
 
-/* CARGAR DATOS SEGURO */
-let archivos;
-try{
-archivos = JSON.parse(localStorage.getItem("archivos")) || baseArchivos;
-}catch(e){
-archivos = baseArchivos;
-}
+/* LIMPIAR BUG ANTERIOR */
+localStorage.removeItem("archivos");
 
-/* GUARDAR */
+let archivos = baseArchivos;
+
 function guardar(){
 localStorage.setItem("archivos", JSON.stringify(archivos));
 }
 
-/* RENDER */
 function render(lista = archivos){
-const contenedor = document.getElementById("lista");
-
-if(!contenedor) return;
-
 let html="";
 lista.forEach((a)=>{
 html+=`
 <div class="card">
-<div class="img-rgb"><img src="${a.imagen}" loading="lazy"></div>
+<div class="img-rgb"><img src="${a.imagen}"></div>
 <h2 class="nombre-rgb">${a.nombre}</h2>
 <div class="fecha">📅 ${a.fecha}</div>
-<div class="contador">⬇️ ${a.descargas || 0} descargas</div>
+<div class="contador">⬇️ ${a.descargas} descargas</div>
 <div class="btn" onclick="descargar('${a.id}')">DESCARGAR</div>
 </div>`;
 });
-
-contenedor.innerHTML = html;
+document.getElementById("lista").innerHTML = html;
 }
 render();
 
-/* DESCARGAR */
+/* DESCARGA CORRECTA */
 function descargar(id){
-const archivo = archivos.find(a => a.id === id);
-if(!archivo) return;
-
-archivo.descargas = (archivo.descargas || 0) + 1;
+let archivo = archivos.find(a => a.id === id);
+if(archivo){
+archivo.descargas++;
 guardar();
 render();
-
-setTimeout(()=>{
-window.open(archivo.link, "_blank");
-},300);
+window.location.href = archivo.link;
+}
 }
 
-/* BUSCAR */
 function buscar(text){
-const filtrados = archivos.filter(a =>
+let filtrados = archivos.filter(a =>
 a.nombre.toLowerCase().includes(text.toLowerCase())
 );
 render(filtrados);
