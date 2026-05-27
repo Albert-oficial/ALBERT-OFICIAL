@@ -1,0 +1,378 @@
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const qrcode = require('qrcode-terminal');
+const pino = require('pino');
+const fs = require('fs');
+const http = require('http');
+
+const OWNER_NUMBER = '51975922748';
+const BOT_NAME = 'KATY MP';
+const CONFIG_FILE = 'config.json';
+const PORT = 3001;
+
+let config = { activo: true };
+if (fs.existsSync(CONFIG_FILE)) {
+  config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+}
+const saveConfig = () => fs.writeFileSync(CONFIG_FILE, JSON.stringify(config));
+
+// Stats en memoria
+const stats = { mensajes: 0, comandos: 0, entradas: 0, salidas: 0 };
+let botConectado = false;
+let reconectando = false;
+let intentos = 0;
+const MAX_INTENTOS = 10;
+
+const FIRMA = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 *Bot:* ${BOT_NAME} 👑
+💫 *Creado por: Albert Oficial*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✨ *¿Quién es Albert Oficial?*
+Albert es un desarrollador peruano apasionado por la tecnología, la innovación y la creación de herramientas inteligentes que hacen la vida más fácil y divertida para todos.
+
+💻 Especialista en automatización y bots para WhatsApp.
+🚀 Siempre a la vanguardia de la innovación digital.
+🎯 Comprometido con la calidad y los detalles en cada proyecto.
+🌎 Su misión: hacer la tecnología accesible para toda la comunidad.
+⚡ Cada bot que crea lleva su sello único de creatividad.
+🏆 Referente en el mundo de la automatización en Perú y Latinoamérica.
+🧠 Autodidacta, curioso y siempre aprendiendo algo nuevo.
+❤️ Apasionado por ayudar a su comunidad con sus creaciones.
+🌟 Sus proyectos impactan la vida de cientos de personas.
+
+💬 _"No solo escribo código, creo experiencias que impactan."_
+✍️ — *Albert Oficial* 🇵🇪
+━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+const chistes = [
+  'Por que el programador se fue a casa? Porque no encontraba el array. 🏠',
+  'Mi codigo no tiene bugs, tiene caracteristicas no documentadas. ✨',
+  'Por que los programadores confunden Halloween con Navidad? Porque Oct 31 = Dec 25. 🎃',
+  'Le pregunte a mi novia si me queria y me dijo: undefined. 💔',
+  'Como se despide un programador? Hasta el break! 👋',
+  'Por que el cafe es el mejor amigo del programador? Porque sin cafe no hay programa. ☕',
+  'Un programador tiene un problema. Decide usar threads. Ahora tiene problemos. 😂',
+  'Por que fui al medico? Porque tenia un virus y ya no se como eliminarlo. 🦠',
+  'Mi mama me dijo que hiciera algo con mi vida... le hice un bucle infinito. 🔄',
+  'Cual es el animal favorito de los programadores? El bug. 🐛',
+];
+
+const frasesRetiro = [
+  'Otro que huyó antes de que llegara la cuenta. 😂',
+  'Se fue tan rápido que dejó los zapatos. 👟',
+  'Se fue al baño y nunca volvió. 🚽',
+  'Adios, que te vaya bien en tu nueva vida de ermitaño. 🏔️',
+  'Sali a buscar wifi y ya no regrese. Suena conocido? 😏',
+  'El grupo lo traumatizo tanto que decidio desaparecer. 💀',
+  'Otro cobarde que no aguanto la presion del grupo. 🏃',
+  'Se fue antes de que le tocara pagar la vuelta. 🍺',
+  'El grupo lo curo de la estupidez... por eso se fue. 😈',
+  'Dejo el grupo como tu ex: sin explicacion. 💔',
+];
+
+// ─── SERVIDOR WEB ────────────────────────────────────────────────
+function iniciarServidor() {
+  const server = http.createServer((req, res) => {
+    // CORS para el panel
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      res.writeHead(200);
+      res.end();
+      return;
+    }
+
+    // Estado del bot
+    if (req.method === 'GET' && req.url === '/estado') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        activo: config.activo,
+        conectado: botConectado,
+        stats,
+        bot: BOT_NAME
+      }));
+      return;
+    }
+
+    // Toggle activar/desactivar
+    if (req.method === 'POST' && req.url === '/toggle') {
+      let body = '';
+      req.on('data', d => body += d);
+      req.on('end', () => {
+        try {
+          const data = JSON.parse(body);
+          config.activo = data.activo;
+          saveConfig();
+          console.log('Bot ' + (config.activo ? '✅ ACTIVADO' : '🔴 DESACTIVADO') + ' desde el panel web');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ activo: config.activo }));
+        } catch(e) {
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: 'Error' }));
+        }
+      });
+      return;
+    }
+
+    // Reiniciar bot
+    if (req.method === 'POST' && req.url === '/reiniciar') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      console.log('🔄 Reinicio solicitado desde panel web...');
+      setTimeout(() => process.exit(0), 500); // PM2 lo reinicia solo
+      return;
+    }
+
+    // Nuevo QR (limpia sesión)
+    if (req.method === 'POST' && req.url === '/nuevo-qr') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      console.log('🗑️ Limpiando sesión para nuevo QR...');
+      setTimeout(() => {
+        fs.rmSync('auth_info', { recursive: true, force: true });
+        process.exit(0);
+      }, 500);
+      return;
+    }
+
+// Servir panel HTML
+if (req.method === 'GET' && req.url === '/') {
+  const html = fs.readFileSync('panel.html', 'utf8');
+  res.writeHead(200, { 'Content-Type': 'text/html' });
+  res.end(html);
+  return;
+}
+res.writeHead(404);
+res.end('Not found');
+    res.end('Not found');
+  });
+
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log('🌐 Panel web disponible en: http://localhost:' + PORT);
+    console.log('📱 Abre panel.html en tu navegador para controlar el bot\n');
+  });
+}
+
+// ─── BOT ────────────────────────────────────────────────────────
+async function startBot() {
+  if (reconectando) return;
+  reconectando = true;
+
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+
+    const sock = makeWASocket({
+      auth: state,
+      logger: pino({ level: 'silent' }),
+      printQRInTerminal: false,
+      keepAliveIntervalMs: 10000,
+      connectTimeoutMs: 60000,
+      retryRequestDelayMs: 2000,
+    });
+
+    reconectando = false;
+    intentos = 0;
+
+    sock.ev.on('connection.update', (update) => {
+      const { connection, lastDisconnect, qr } = update;
+
+      if (qr) {
+        console.log('\n📱 Escanea este QR:\n');
+        qrcode.generate(qr, { small: true });
+      }
+
+      if (connection === 'close') {
+        botConectado = false;
+        const code = lastDisconnect?.error?.output?.statusCode;
+        console.log('⚠️ Conexión cerrada. Código:', code);
+
+        if (code === DisconnectReason.loggedOut) {
+          console.log('❌ Sesión cerrada. Usa el panel → Nuevo QR.');
+          return;
+        }
+
+        intentos++;
+        if (intentos > MAX_INTENTOS) {
+          console.log('❌ Demasiados intentos. Limpiando sesión...');
+          fs.rmSync('auth_info', { recursive: true, force: true });
+          intentos = 0;
+        }
+
+        const espera = Math.min(intentos * 3000, 15000);
+        console.log(`🔄 Reconectando en ${espera / 1000}s... (intento ${intentos})`);
+        setTimeout(() => {
+          reconectando = false;
+          startBot();
+        }, espera);
+      }
+
+      if (connection === 'open') {
+        botConectado = true;
+        console.log('\n✅ ' + BOT_NAME + ' conectado!');
+        console.log('Estado: ' + (config.activo ? '🟢 Activo' : '🔴 Inactivo') + '\n');
+        intentos = 0;
+      }
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    // Ping para mantener conexión
+    setInterval(async () => {
+      try { await sock.sendPresenceUpdate('available'); } catch {}
+    }, 30000);
+
+    sock.ev.on('group-participants.update', async ({ id, participants, action }) => {
+      try {
+        if (action === 'remove' || action === 'leave') {
+          stats.salidas++;
+          const frase = frasesRetiro[Math.floor(Math.random() * frasesRetiro.length)];
+          const num = participants[0].replace('@s.whatsapp.net', '');
+          await sock.sendMessage(id, { text: '👋 *' + num + '* acaba de salir del grupo.\n\n😂 ' + frase });
+        }
+        if (action === 'add') {
+          stats.entradas++;
+          for (const participant of participants) {
+            const num = participant.replace('@s.whatsapp.net', '');
+            let ppUrl = null;
+            try { ppUrl = await sock.profilePictureUrl(participant, 'image'); } catch {}
+            const welcomeText = '🎉 *¡Bienvenido/a al grupo!* 🎉\n\n👤 *Número:* ' + num + '\n🌟 Escribe *!help* para ver los comandos.\n' + FIRMA;
+            if (ppUrl) {
+              await sock.sendMessage(id, { image: { url: ppUrl }, caption: welcomeText, mentions: [participant] });
+            } else {
+              await sock.sendMessage(id, { text: welcomeText, mentions: [participant] });
+            }
+          }
+        }
+      } catch (e) { console.log('Error group:', e.message); }
+    });
+
+    sock.ev.on('messages.upsert', async ({ messages }) => {
+      try {
+        const msg = messages[0];
+        if (!msg.message) return;
+        if (msg.key.fromMe) return;
+
+        stats.mensajes++;
+
+        const from = msg.key.remoteJid;
+        const senderNumber = from.replace('@s.whatsapp.net', '').replace('@g.us', '');
+        const esOwner = msg.key.participant
+          ? msg.key.participant.replace('@s.whatsapp.net', '') === OWNER_NUMBER
+          : senderNumber === OWNER_NUMBER;
+
+        const texto = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+        const body = texto.trim();
+        const comando = body.split(' ')[0].toLowerCase();
+        const args = body.split(' ').slice(1);
+        const bodyLower = body.toLowerCase();
+        const responder = (text) => sock.sendMessage(from, { text }, { quoted: msg });
+
+        if (esOwner) {
+          if (comando === '!activar') {
+            config.activo = true; saveConfig();
+            responder('✅ *' + BOT_NAME + ' activado!*\n' + FIRMA); return;
+          }
+          if (comando === '!desactivar') {
+            config.activo = false; saveConfig();
+            responder('🔴 *' + BOT_NAME + ' desactivado!*\n' + FIRMA); return;
+          }
+          if (comando === '!broadcast') {
+            if (!args.length) return responder('Uso: !broadcast <mensaje>');
+            responder('📢 Broadcast:\n\n' + args.join(' ') + '\n' + FIRMA); return;
+          }
+          if (comando === '!status') {
+            responder('📊 *Estado de ' + BOT_NAME + '*\n\n' +
+              (config.activo ? '🟢 Bot: Activo' : '🔴 Bot: Inactivo') +
+              '\n📨 Mensajes: ' + stats.mensajes +
+              '\n⚡ Comandos: ' + stats.comandos +
+              '\n👑 Owner: Albert Oficial\n' + FIRMA); return;
+          }
+          if (comando === '!say') {
+            if (!args.length) return responder('Uso: !say <mensaje>');
+            sock.sendMessage(from, { text: args.join(' ') }); return;
+          }
+          if (comando === '!ownerhelp') {
+            responder('👑 *Comandos del propietario:*\n\n🟢 *!activar*\n🔴 *!desactivar*\n📢 *!broadcast <msg>*\n📊 *!status*\n🗣️ *!say <msg>*\n❓ *!ownerhelp*\n' + FIRMA); return;
+          }
+        }
+
+        if (!config.activo) return;
+
+        if (comando.startsWith('!')) stats.comandos++;
+
+        if (comando === '!help') {
+          responder('📋 *Comandos de ' + BOT_NAME + ':*\n\n🔹 *!help* — Este menú\n🔹 *!ping* — Estado\n🔹 *!info* — Info del bot\n🔹 *!hora* — Hora Perú\n🔹 *!dado* — Lanza un dado\n🔹 *!chiste* — Chiste aleatorio\n🔹 *!creador* — Info creador\n🔹 *!moneda* — Cara o sello\n🔹 *!frase* — Frase motivacional\n🔹 *!enamorado* — Nivel enamorado\n🔹 *!gay* — Nivel gay\n🔹 *!estupido* — Nivel estupidez\n🔹 *!suerte* — Tu suerte hoy\n🔹 *!calcula <n> <op> <n>* — Calculadora\n\n' + FIRMA); return;
+        }
+        if (comando === '!ping') { responder('🏓 Pong! ' + BOT_NAME + ' activo.\n' + FIRMA); return; }
+        if (comando === '!info') { responder('ℹ️ *' + BOT_NAME + '*\n👑 Creador: Albert Oficial\n⚙️ Motor: Baileys\n📅 v2.0.0\n🌎 Perú 🇵🇪\n' + FIRMA); return; }
+        if (comando === '!hora') { responder('🕐 *Hora (Perú):*\n' + new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' }) + '\n' + FIRMA); return; }
+        if (comando === '!dado') {
+          const r = Math.floor(Math.random() * 6) + 1;
+          responder('🎲 Resultado: ' + ['','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣'][r] + ' (' + r + ')\n' + FIRMA); return;
+        }
+        if (comando === '!chiste') { responder('😂 ' + chistes[Math.floor(Math.random() * chistes.length)] + '\n' + FIRMA); return; }
+        if (comando === '!creador') { responder('👑 *Albert Oficial*\n\nDesarrollador peruano especializado en bots WhatsApp.\n"La tecnologia en manos correctas puede cambiar el mundo."\n🇵🇪\n' + FIRMA); return; }
+        if (comando === '!moneda') { responder('🪙 ' + (Math.random() < 0.5 ? 'CARA' : 'SELLO') + '\n' + FIRMA); return; }
+        if (comando === '!frase') {
+          const frases = ['El exito es la suma de pequeños esfuerzos repetidos.','No importa que tan lento vayas, no te detengas.','Cree en ti mismo y todo sera posible.','Cada dia es una nueva oportunidad.','Tu unico limite eres tu mismo.'];
+          responder('💪 ' + frases[Math.floor(Math.random() * frases.length)] + '\n' + FIRMA); return;
+        }
+        if (comando === '!enamorado') {
+          const n = Math.floor(Math.random() * 101);
+          const b = '❤️'.repeat(Math.floor(n/10)) + '🖤'.repeat(10-Math.floor(n/10));
+          const c = n<20?'Eres de piedra. 🗿':n<40?'Algo de sentimientos. 🤏':n<60?'Ni frío ni caliente. 😐':n<80?'Bien enamoradito. 🥰':'¡Perdidamente enamorado! 💘';
+          responder('💕 *Nivel Enamorado*\n\n' + b + '\n📊 ' + n + '%\n\n' + c + '\n' + FIRMA); return;
+        }
+        if (comando === '!gay') {
+          const n = Math.floor(Math.random() * 101);
+          const b = '🌈'.repeat(Math.floor(n/10)) + '⬜'.repeat(10-Math.floor(n/10));
+          const c = n<20?'Bien machito. 💪':n<40?'Solo curioso. 👀':n<60?'En el medio. 😏':n<80?'Ya casi. 🌈':'Full arcoiris! 🏳️‍🌈';
+          responder('🌈 *Nivel Gay*\n\n' + b + '\n📊 ' + n + '%\n\n' + c + '\n' + FIRMA); return;
+        }
+        if (comando === '!estupido') {
+          const n = Math.floor(Math.random() * 101);
+          const b = '🧠'.repeat(Math.floor(n/10)) + '💀'.repeat(10-Math.floor(n/10));
+          const c = n<20?'Bastante inteligente. 😏':n<40?'Solo un poco tonto. 😅':n<60?'Nivel intermedio. 🤦':n<80?'Ya preocupa. 😬':'Nivel crítico! 💀';
+          responder('🧠 *Nivel Estupidez*\n\n' + b + '\n📊 ' + n + '%\n\n' + c + '\n' + FIRMA); return;
+        }
+        if (comando === '!suerte') {
+          const n = Math.floor(Math.random() * 101);
+          const b = '🍀'.repeat(Math.floor(n/10)) + '💀'.repeat(10-Math.floor(n/10));
+          const c = n<20?'Quédate en casa. 🏠':n<40?'No es tu día. 😬':n<60?'Día normal. 😐':n<80?'Bastante suerte! 🍀':'¡Juega la lotería! 🎰';
+          responder('🍀 *Tu suerte hoy*\n\n' + b + '\n📊 ' + n + '%\n\n' + c + '\n' + FIRMA); return;
+        }
+        if (comando === '!calcula') {
+          if (args.length < 3) return responder('Uso: !calcula 10 + 5');
+          const a = parseFloat(args[0]), op = args[1], b = parseFloat(args[2]);
+          if (isNaN(a)||isNaN(b)) return responder('Números inválidos.');
+          let r;
+          if (op==='+') r=a+b; else if(op==='-') r=a-b; else if(op==='*') r=a*b;
+          else if(op==='/') r=b!==0?a/b:'No dividas entre 0'; else return responder('Operación inválida.');
+          responder('🧮 ' + a + ' ' + op + ' ' + b + ' = *' + r + '*\n' + FIRMA); return;
+        }
+
+        if (bodyLower.includes('hola')||bodyLower.includes('buenas')||bodyLower.includes('alo')) { responder('👋 Hola! Soy *' + BOT_NAME + '*. Escribe *!help*.\n' + FIRMA); return; }
+        if (bodyLower.includes('buenos dias')) { responder('🌅 Buenos días!\n' + FIRMA); return; }
+        if (bodyLower.includes('buenas tardes')) { responder('🌇 Buenas tardes!\n' + FIRMA); return; }
+        if (bodyLower.includes('buenas noches')) { responder('🌙 Buenas noches!\n' + FIRMA); return; }
+        if (bodyLower.includes('gracias')) { responder('🙏 De nada! — *Albert Oficial*\n' + FIRMA); return; }
+        if (bodyLower.includes('quien eres')||bodyLower.includes('que eres')) { responder('🤖 Soy *' + BOT_NAME + '*, bot de WhatsApp por *Albert Oficial*.\n' + FIRMA); return; }
+        if (bodyLower.includes('como estas')||bodyLower.includes('como estás')) { responder('🤖 Al 100%! Y tú?\n' + FIRMA); return; }
+        if (bodyLower.includes('te quiero')||bodyLower.includes('te amo')) { responder('❤️ Yo también! Pero soy un bot jaja. — *Albert Oficial*\n' + FIRMA); return; }
+        if (bodyLower.includes('aburrido')||bodyLower.includes('aburrida')) { responder('😂 Escribe *!chiste* o *!dado*!\n' + FIRMA); return; }
+
+      } catch(e) { console.log('Error mensaje:', e.message); }
+    });
+
+  } catch(e) {
+    console.log('Error iniciando bot:', e.message);
+    reconectando = false;
+    setTimeout(() => startBot(), 5000);
+  }
+}
+
+// Iniciar todo
+iniciarServidor();
+startBot();

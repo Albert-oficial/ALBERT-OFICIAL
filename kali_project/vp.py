@@ -1,0 +1,201 @@
+import os
+import time
+import random
+import shutil
+from colorama import Fore, init
+
+init(autoreset=True)
+
+frames = [
+    "🌍",
+    "🌎",
+    "🌏",
+    "💻",
+    "🛰️",
+    "🔐",
+    "⚠️",
+    "📡",
+    "🛡️",
+    "☠️"
+]
+
+os.system("clear")
+os.system("toilet -f big 'KALI LINUX'")
+
+banner = r'''
+██╗  ██╗ █████╗ ██╗     ██╗    ██╗     ██╗███╗   ██╗██╗   ██╗██╗  ██╗
+██║ ██╔╝██╔══██╗██║     ██║    ██║     ██║████╗  ██║██║   ██║╚██╗██╔╝
+█████╔╝ ███████║██║     ██║    ██║     ██║██╔██╗ ██║██║   ██║ ╚███╔╝
+██╔═██╗ ██╔══██║██║     ██║    ██║     ██║██║╚██╗██║██║   ██║ ██╔██╗
+██║  ██╗██║  ██║███████╗██║    ███████╗██║██║ ╚████║╚██████╔╝██╔╝ ██╗
+╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝    ╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝
+'''
+
+def show_banner(text):
+    try:
+        width = shutil.get_terminal_size().columns
+        print(Fore.RED + "\n".join(line.center(width) for line in text.split("\n")))
+    except:
+        print(Fore.RED + text)
+
+show_banner(banner)
+
+cmd = input(Fore.GREEN + "\nroot@kali-node:~# ")
+
+if cmd == "KALI2927760128":
+
+    os.system("clear")
+
+    print(Fore.RED + "\n==============================")
+    print(Fore.RED + "         KALI LINUX")
+    print(Fore.RED + "==============================")
+
+    procesos = [
+        "Iniciando modulo de ciberseguridad",
+        "Conectando nodo remoto",
+        "Verificando acceso seguro",
+        "Accediendo a base de datos remota",
+        "Analizando registros del sistema",
+        "Escaneando puertos vulnerables",
+        "Iniciando monitoreo en tiempo real",
+        "Monitoreo encontrado",
+        "Detectando conexiones activas",
+        "Analizando paquetes TCP/IP",
+        "Inspeccionando trafico sospechoso",
+        "Buscando vulnerabilidades criticas",
+        "Sincronizando telemetria del nodo",
+        "Verificando firewall principal",
+        "Cargando modulo forense",
+        "Analizando actividad del dispositivo",
+        "Comprobando cifrado SSL/TLS",
+        "Escaneando procesos del sistema",
+        "Verificando integridad del kernel",
+        "Estableciendo tunel seguro",
+        "Accediendo cache distribuida",
+        "Inicializando consola de monitoreo",
+        "Verificando actividad remota",
+        "Comprobando servicios expuestos",
+        "Analizando logs del dispositivo",
+        "Motor de ciberseguridad iniciado"
+    ]
+
+    for i, p in enumerate(procesos):
+
+        hora = time.strftime("%H:%M:%S")
+        icono = frames[i % len(frames)]
+
+        estado = "ON"
+        color = Fore.GREEN
+
+        print(color + f"[{hora}] {icono} [+] {p} ... {estado}")
+
+        time.sleep(0.20)
+
+    print(Fore.YELLOW + "\n============= PROFILE DATA =============\n")
+
+    datos = [
+
+        ("Nombre", "Daniel Enrique"),
+        ("Apellidos", "Elio Ocampo"),
+        ("Padre", "Marco Elio Rodriguez"),
+        ("Madre", "Sara Ocampo Lencina"),
+        ("Sexo", "Hombre"),
+        ("Estado", "Soltero"),
+        ("Fecha Nacimiento", "29 Junio 2001"),
+        ("Pais", "Peru"),
+        ("Region", "Lima Metropolitana"),
+        ("Ciudad", "Lima"),
+        ("Distrito", "Ate"),
+        ("Ubicacion", "AV Santa Clara / C:09"),
+        ("Proveedor", "INTEGRATEL PERU S.A.A."),
+        ("IP Principal", "181.65.214.92"),
+        ("IP Secundaria", "192.168.18.24"),
+        ("Operador", "Movistar"),
+        ("Linea Activa", "+51 975922748"),
+        ("Linea Secundaria", "+51 916 483 229"),
+        ("Pago Pendiente", "S/55"),
+        ("Linea Adicional", "+51 978 224 610"),
+        ("Pago Adicional", "S/37"),
+        ("Linea Bitel", "+51 930 551 742"),
+        ("Trabajo", "Asistente Tecnico Redes"),
+        ("Registro 2023", "Orden Publico"),
+        ("Registro 2025", "Incidente Vehicular"),
+        ("Estado Legal", "Sin procesos activos"),
+        ("Colegio", "Colegio Trilce Los Olivos"),
+        ("Moto Taxi", "4582-AB"),
+        ("Moto Lineal", "9016-XT"),
+        ("Celular 1", "Samsung Galaxy A15"),
+        ("Celular 2", "Redmi Note 13"),
+        ("Celular 3", "Realme C67"),
+        ("Laptop", "MacBook Air M4"),
+        ("Direccion MAC", "A4:9F:34:8C:12:7D"),
+        ("CPU", "Apple Silicon M4"),
+        ("GPU", "10-Core GPU"),
+        ("RAM", "16GB Unified"),
+        ("SSD", "512GB SSD"),
+        ("Pantalla", "13.6 Retina"),
+        ("Resolucion", "2560x1664"),
+        ("Sistema", "macOS Sequoia"),
+        ("Kernel", "Darwin 24.2.0"),
+        ("Estado Dispositivo", "ONLINE")
+    ]
+
+    for i, (k, v) in enumerate(datos):
+
+        icono = frames[i % len(frames)]
+
+        print(Fore.CYAN + f"{icono} [DATA] {k:<20} : {v}")
+
+        time.sleep(0.08)
+
+    print(Fore.MAGENTA + "\n============= ESTADO DE RED =============\n")
+
+    network = [
+        "CAPA_TLS               : ACTIVA",
+        "NODO_REMOTO            : CONECTADO",
+        "FIREWALL               : HABILITADO",
+        "MONITOREO_RED          : ACTIVO",
+        "LATENCIA               : 18ms",
+        "PERDIDA_PAQUETES       : 0.2%",
+        "PUERTO_443             : ABIERTO",
+        "PUERTO_80              : ABIERTO",
+        "PUERTO_22              : FILTRADO",
+        "DISPOSITIVO            : EN LINEA",
+        "BASE_DATOS             : CONECTADA",
+        "TRAFICO_RED            : ESTABLE",
+        "CIFRADO_SSL_TLS        : VERIFICADO",
+        "SESION_SEGURA          : ESTABLECIDA",
+        "MONITOREO              : EN TIEMPO REAL",
+        "SERVICIOS_REMOTOS      : ACTIVOS",
+        "ANALISIS_FORENSE       : COMPLETADO",
+        "ESCANEO_VULNERABILIDAD : FINALIZADO"
+    ]
+
+    for i, n in enumerate(network):
+
+        icono = frames[i % len(frames)]
+
+        print(Fore.GREEN + f"{icono} {n}")
+
+        time.sleep(0.10)
+
+    print(Fore.RED + "\n============= TELEMETRIA EN VIVO =============\n")
+
+    for i in range(25):
+
+        up = random.randint(100,900)
+        down = random.randint(300,1200)
+        lat = random.randint(10,40)
+
+        estado = "ON"
+        color = Fore.GREEN
+
+        print(color + f"📡 [NODO-{random.randint(1000,9999)}] SUBIDA:{up}KB/s BAJADA:{down}KB/s LATENCIA:{lat}ms [{estado}]")
+
+        time.sleep(0.08)
+
+    print(Fore.GREEN + "\n[✓] SESION FINALIZADA")
+
+else:
+    print(Fore.RED + "\n[!] CODIGO INVALIDO")
+

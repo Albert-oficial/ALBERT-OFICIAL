@@ -1,0 +1,466 @@
+const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const qrcode = require('qrcode-terminal');
+const pino = require('pino');
+const fs = require('fs');
+const http = require('http');
+
+const OWNER_NUMBER = '51975922748';
+const BOT_NAME = 'KATY MP';
+const CONFIG_FILE = 'config.json';
+const PORT = 3001;
+
+let config = { activo: true };
+if (fs.existsSync(CONFIG_FILE)) {
+  config = JSON.parse(fs.readFileSync(CONFIG_FILE));
+}
+const saveConfig = () => fs.writeFileSync(CONFIG_FILE, JSON.stringify(config));
+
+const stats = { mensajes: 0, comandos: 0, entradas: 0, salidas: 0 };
+let botConectado = false;
+let reconectando = false;
+let intentos = 0;
+const MAX_INTENTOS = 10;
+
+const FIRMA = `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🤖 *Bot:* ${BOT_NAME} 👑
+💫 *Creado por: Albert Oficial*
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✨ *¿Quién es Albert Oficial?*
+Albert es un desarrollador peruano apasionado por la tecnología, la innovación y la creación de herramientas inteligentes que hacen la vida más fácil y divertida para todos.
+
+💻 Especialista en automatización y bots para WhatsApp.
+🚀 Siempre a la vanguardia de la innovación digital.
+🎯 Comprometido con la calidad y los detalles en cada proyecto.
+🌎 Su misión: hacer la tecnología accesible para toda la comunidad.
+⚡ Cada bot que crea lleva su sello único de creatividad.
+🏆 Referente en el mundo de la automatización en Perú y Latinoamérica.
+🧠 Autodidacta, curioso y siempre aprendiendo algo nuevo.
+❤️ Apasionado por ayudar a su comunidad con sus creaciones.
+🌟 Sus proyectos impactan la vida de cientos de personas.
+
+💬 _"No solo escribo código, creo experiencias que impactan."_
+✍️ — *Albert Oficial* 🇵🇪
+━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+
+const chistes = [
+  'Por que el programador se fue a casa? Porque no encontraba el array. 🏠',
+  'Mi codigo no tiene bugs, tiene caracteristicas no documentadas. ✨',
+  'Por que los programadores confunden Halloween con Navidad? Porque Oct 31 = Dec 25. 🎃',
+  'Le pregunte a mi novia si me queria y me dijo: undefined. 💔',
+  'Como se despide un programador? Hasta el break! 👋',
+  'Por que el cafe es el mejor amigo del programador? Porque sin cafe no hay programa. ☕',
+  'Un programador tiene un problema. Decide usar threads. Ahora tiene problemos. 😂',
+  'Por que fui al medico? Porque tenia un virus y ya no se como eliminarlo. 🦠',
+  'Mi mama me dijo que hiciera algo con mi vida... le hice un bucle infinito. 🔄',
+  'Cual es el animal favorito de los programadores? El bug. 🐛',
+];
+
+const frasesRetiro = [
+  'Otro que huyó antes de que llegara la cuenta. 😂',
+  'Se fue tan rápido que dejó los zapatos. 👟',
+  'Se fue al baño y nunca volvió. 🚽',
+  'Adios, que te vaya bien en tu nueva vida de ermitaño. 🏔️',
+  'Sali a buscar wifi y ya no regrese. Suena conocido? 😏',
+  'El grupo lo traumatizo tanto que decidio desaparecer. 💀',
+  'Otro cobarde que no aguanto la presion del grupo. 🏃',
+  'Se fue antes de que le tocara pagar la vuelta. 🍺',
+  'El grupo lo curo de la estupidez... por eso se fue. 😈',
+  'Dejo el grupo como tu ex: sin explicacion. 💔',
+];
+
+// ─── PANEL HTML INTEGRADO ────────────────────────────────────────
+const PANEL_HTML = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOT KATY — Panel</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{--verde:#00ff88;--rojo:#ff3366;--cyan:#00e5ff;--fondo:#050a0e;--panel:#0a1520;--borde:#0d2535;--texto:#a0c4d8}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--fondo);font-family:'Rajdhani',sans-serif;color:var(--texto);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 40% at 50% 0%,rgba(0,229,255,.07) 0%,transparent 60%),radial-gradient(ellipse 60% 30% at 80% 80%,rgba(0,255,136,.05) 0%,transparent 50%);pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,.03) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+.container{position:relative;z-index:1;max-width:480px;margin:0 auto;padding:20px 16px 40px}
+.header{text-align:center;padding:30px 0 20px}
+.logo-ring{width:90px;height:90px;margin:0 auto 16px;position:relative}
+.logo-ring svg{width:100%;height:100%;animation:spin 8s linear infinite}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.logo-inner{position:absolute;inset:12px;background:var(--panel);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;border:1px solid var(--borde)}
+.titulo{font-family:'Orbitron',monospace;font-size:22px;font-weight:900;letter-spacing:4px;color:#fff;text-shadow:0 0 20px rgba(0,229,255,.5)}
+.subtitulo{font-size:12px;letter-spacing:3px;color:var(--cyan);opacity:.6;margin-top:4px;text-transform:uppercase}
+.card{background:var(--panel);border:1px solid var(--borde);border-radius:16px;padding:20px;margin-bottom:16px;position:relative;overflow:hidden;animation:fadeUp .4s ease both}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);opacity:.4}
+.card-titulo{font-family:'Orbitron',monospace;font-size:10px;letter-spacing:3px;color:var(--cyan);opacity:.6;margin-bottom:14px;text-transform:uppercase}
+.estado-row{display:flex;align-items:center;justify-content:space-between}
+.estado-info{display:flex;align-items:center;gap:12px}
+.punto{width:14px;height:14px;border-radius:50%;background:var(--verde);box-shadow:0 0 12px var(--verde);flex-shrink:0}
+.punto.inactivo{background:var(--rojo);box-shadow:0 0 12px var(--rojo)}
+.punto.activo{animation:pulso 1.5s ease-in-out infinite}
+@keyframes pulso{0%,100%{box-shadow:0 0 8px var(--verde)}50%{box-shadow:0 0 20px var(--verde),0 0 40px rgba(0,255,136,.3)}}
+.estado-texto{font-family:'Orbitron',monospace;font-size:15px;font-weight:700;color:#fff}
+.estado-sub{font-size:12px;color:var(--texto);opacity:.5;margin-top:2px}
+.toggle-wrap{display:flex;flex-direction:column;align-items:center;gap:4px}
+.toggle{width:56px;height:28px;background:rgba(255,51,102,.2);border:1px solid var(--rojo);border-radius:14px;cursor:pointer;position:relative;transition:all .3s ease}
+.toggle.on{background:rgba(0,255,136,.15);border-color:var(--verde)}
+.toggle-ball{position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:var(--rojo);transition:all .3s ease;box-shadow:0 0 8px var(--rojo)}
+.toggle.on .toggle-ball{left:31px;background:var(--verde);box-shadow:0 0 8px var(--verde)}
+.toggle-label{font-family:'Orbitron',monospace;font-size:8px;letter-spacing:1px;color:var(--texto);opacity:.5}
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.stat-box{background:rgba(0,229,255,.04);border:1px solid var(--borde);border-radius:10px;padding:14px 12px;text-align:center}
+.stat-num{font-family:'Orbitron',monospace;font-size:22px;font-weight:900;color:var(--cyan);text-shadow:0 0 15px rgba(0,229,255,.4)}
+.stat-label{font-size:10px;letter-spacing:1px;color:var(--texto);opacity:.5;margin-top:4px;text-transform:uppercase}
+.btn-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+.btn{padding:14px 10px;border-radius:10px;border:1px solid;font-family:'Orbitron',monospace;font-size:9px;letter-spacing:2px;font-weight:700;cursor:pointer;text-transform:uppercase;transition:all .2s;background:transparent;display:flex;flex-direction:column;align-items:center;gap:6px}
+.btn span.icon{font-size:18px}
+.btn-cyan{border-color:var(--cyan);color:var(--cyan)}
+.btn-verde{border-color:var(--verde);color:var(--verde)}
+.btn-rojo{border-color:var(--rojo);color:var(--rojo)}
+.btn-amarillo{border-color:#ffcc00;color:#ffcc00}
+.conexion-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:11px;font-family:'Orbitron',monospace;letter-spacing:1px}
+.badge-ok{background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.3);color:var(--verde)}
+.badge-err{background:rgba(255,51,102,.08);border:1px solid rgba(255,51,102,.3);color:var(--rojo)}
+.puntito{width:6px;height:6px;border-radius:50%;background:currentColor}
+.logs-box{background:#020810;border:1px solid var(--borde);border-radius:10px;padding:12px;height:160px;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.6}
+.logs-box::-webkit-scrollbar{width:4px}
+.logs-box::-webkit-scrollbar-thumb{background:var(--borde);border-radius:2px}
+.log-line{margin-bottom:2px}
+.log-ok{color:var(--verde)}
+.log-err{color:var(--rojo)}
+.log-info{color:var(--cyan)}
+.log-warn{color:#ffcc00}
+.footer{text-align:center;margin-top:24px;font-size:10px;letter-spacing:2px;color:var(--texto);opacity:.3;text-transform:uppercase}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--panel);border:1px solid var(--cyan);color:var(--cyan);padding:10px 20px;border-radius:30px;font-family:'Orbitron',monospace;font-size:11px;letter-spacing:2px;transition:transform .3s ease;z-index:100;white-space:nowrap}
+.toast.show{transform:translateX(-50%) translateY(0)}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="logo-ring">
+      <svg viewBox="0 0 90 90" fill="none"><circle cx="45" cy="45" r="42" stroke="url(#g1)" stroke-width="1.5" stroke-dasharray="6 4"/><circle cx="45" cy="45" r="35" stroke="rgba(0,229,255,0.15)" stroke-width="1"/><defs><linearGradient id="g1" x1="0" y1="0" x2="90" y2="90" gradientUnits="userSpaceOnUse"><stop offset="0%" stop-color="#00e5ff"/><stop offset="50%" stop-color="#00ff88"/><stop offset="100%" stop-color="#00e5ff" stop-opacity="0"/></linearGradient></defs></svg>
+      <div class="logo-inner">🤖</div>
+    </div>
+    <div class="titulo">BOT KATY</div>
+    <div class="subtitulo">Panel de Control</div>
+  </div>
+  <div class="card">
+    <div class="card-titulo">◈ Estado del Sistema</div>
+    <div class="estado-row">
+      <div class="estado-info">
+        <div class="punto activo" id="puntoBotEstado"></div>
+        <div>
+          <div class="estado-texto" id="textoEstado">ACTIVO</div>
+          <div class="estado-sub" id="subEstado">Respondiendo mensajes</div>
+        </div>
+      </div>
+      <div class="toggle-wrap">
+        <div class="toggle on" id="toggleBot" onclick="toggleBot()"><div class="toggle-ball"></div></div>
+        <div class="toggle-label">ON/OFF</div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-titulo">◈ Conexión WhatsApp</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <span class="conexion-badge badge-ok" id="badgeConexion"><span class="puntito"></span><span id="textoConexion">Conectado</span></span>
+      <span style="font-size:11px;opacity:.4;" id="tiempoActivo">Uptime: 00:00:00</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-titulo">◈ Estadísticas</div>
+    <div class="stats-grid">
+      <div class="stat-box"><div class="stat-num" id="statMensajes">0</div><div class="stat-label">Mensajes</div></div>
+      <div class="stat-box"><div class="stat-num" id="statComandos">0</div><div class="stat-label">Comandos</div></div>
+      <div class="stat-box"><div class="stat-num" id="statEntradas">0</div><div class="stat-label">Entradas</div></div>
+      <div class="stat-box"><div class="stat-num" id="statSalidas">0</div><div class="stat-label">Salidas</div></div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn btn-verde" onclick="accion('reiniciar')"><span class="icon">🔄</span>Reiniciar</button>
+    <button class="btn btn-rojo" onclick="accion('limpiarSesion')"><span class="icon">🗑️</span>Nuevo QR</button>
+    <button class="btn btn-cyan" onclick="accion('estado')"><span class="icon">📊</span>Verificar</button>
+    <button class="btn btn-amarillo" onclick="limpiarLogs()"><span class="icon">🧹</span>Limpiar Log</button>
+  </div>
+  <div class="card">
+    <div class="card-titulo" style="display:flex;justify-content:space-between;align-items:center;"><span>◈ Registro en Vivo</span><span style="font-size:9px;opacity:.4;" id="ultimaActualizacion">—</span></div>
+    <div class="logs-box" id="logsBox">
+      <div class="log-line log-info">▶ Panel iniciado...</div>
+    </div>
+  </div>
+  <div class="footer">BOT KATY — Albert Oficial 🇵🇪</div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+const API = '';
+let botActivo = true;
+let inicioBot = Date.now();
+
+function mostrarToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+function agregarLog(texto,tipo='info'){const box=document.getElementById('logsBox');const l=document.createElement('div');l.className='log-line log-'+tipo;const h=new Date().toLocaleTimeString('es-PE');l.textContent='['+h+'] '+texto;box.appendChild(l);box.scrollTop=box.scrollHeight;document.getElementById('ultimaActualizacion').textContent=h}
+function limpiarLogs(){document.getElementById('logsBox').innerHTML='';agregarLog('Log limpiado','info');mostrarToast('✓ LOG LIMPIADO')}
+
+function actualizarUI(activo){
+  botActivo=activo;
+  const punto=document.getElementById('puntoBotEstado');
+  const toggle=document.getElementById('toggleBot');
+  const texto=document.getElementById('textoEstado');
+  const sub=document.getElementById('subEstado');
+  if(activo){punto.className='punto activo';toggle.className='toggle on';texto.textContent='ACTIVO';texto.style.color='var(--verde)';sub.textContent='Respondiendo mensajes'}
+  else{punto.className='punto inactivo';toggle.className='toggle';texto.textContent='INACTIVO';texto.style.color='var(--rojo)';sub.textContent='Bot pausado manualmente'}
+}
+
+async function toggleBot(){
+  try{
+    const res=await fetch('/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({activo:!botActivo})});
+    const data=await res.json();
+    actualizarUI(data.activo);
+    agregarLog(data.activo?'✓ Bot activado':'✗ Bot desactivado',data.activo?'ok':'err');
+    mostrarToast(data.activo?'✓ BOT ACTIVADO':'✗ BOT DESACTIVADO');
+  }catch(e){agregarLog('Error al conectar','err');mostrarToast('⚠ ERROR')}
+}
+
+async function accion(tipo){
+  try{
+    if(tipo==='reiniciar'){agregarLog('Reiniciando...','warn');mostrarToast('🔄 REINICIANDO...');await fetch('/reiniciar',{method:'POST'});agregarLog('Reinicio enviado','ok')}
+    else if(tipo==='limpiarSesion'){agregarLog('Generando nuevo QR...','warn');mostrarToast('🗑️ NUEVO QR...');await fetch('/nuevo-qr',{method:'POST'});agregarLog('Abre Termux para ver el QR','ok')}
+    else if(tipo==='estado'){await obtenerEstado();mostrarToast('✓ ACTUALIZADO')}
+  }catch(e){agregarLog('Error: '+e.message,'err');mostrarToast('⚠ ERROR')}
+}
+
+async function obtenerEstado(){
+  try{
+    const res=await fetch('/estado');
+    const data=await res.json();
+    actualizarUI(data.activo);
+    if(data.stats){
+      document.getElementById('statMensajes').textContent=data.stats.mensajes||0;
+      document.getElementById('statComandos').textContent=data.stats.comandos||0;
+      document.getElementById('statEntradas').textContent=data.stats.entradas||0;
+      document.getElementById('statSalidas').textContent=data.stats.salidas||0;
+    }
+    const badge=document.getElementById('badgeConexion');
+    const textoC=document.getElementById('textoConexion');
+    if(data.conectado){badge.className='conexion-badge badge-ok';textoC.textContent='Conectado'}
+    else{badge.className='conexion-badge badge-err';textoC.textContent='Desconectado'}
+  }catch(e){
+    document.getElementById('badgeConexion').className='conexion-badge badge-err';
+    document.getElementById('textoConexion').textContent='Sin conexión';
+    agregarLog('Sin conexión al servidor','err');
+  }
+}
+
+function actualizarUptime(){
+  const seg=Math.floor((Date.now()-inicioBot)/1000);
+  const h=Math.floor(seg/3600),m=Math.floor((seg%3600)/60),s=seg%60;
+  document.getElementById('tiempoActivo').textContent='Uptime: '+String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+
+obtenerEstado();
+setInterval(obtenerEstado,5000);
+setInterval(actualizarUptime,1000);
+agregarLog('Panel BOT KATY iniciado','ok');
+</script>
+</body>
+</html>`;
+
+// ─── SERVIDOR WEB ────────────────────────────────────────────────
+function iniciarServidor() {
+  const server = http.createServer((req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+
+    if (req.method === 'GET' && req.url === '/') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(PANEL_HTML);
+      return;
+    }
+    if (req.method === 'GET' && req.url === '/estado') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ activo: config.activo, conectado: botConectado, stats, bot: BOT_NAME }));
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/toggle') {
+      let body = '';
+      req.on('data', d => body += d);
+      req.on('end', () => {
+        try {
+          const data = JSON.parse(body);
+          config.activo = data.activo;
+          saveConfig();
+          console.log('Bot ' + (config.activo ? '✅ ACTIVADO' : '🔴 DESACTIVADO') + ' desde panel');
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ activo: config.activo }));
+        } catch(e) { res.writeHead(400); res.end('{}'); }
+      });
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/reiniciar') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      setTimeout(() => process.exit(0), 500);
+      return;
+    }
+    if (req.method === 'POST' && req.url === '/nuevo-qr') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true }));
+      setTimeout(() => { fs.rmSync('auth_info', { recursive: true, force: true }); process.exit(0); }, 500);
+      return;
+    }
+    res.writeHead(404);
+    res.end('Not found');
+  });
+
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log('🌐 Panel web: http://localhost:' + PORT);
+    console.log('📱 Abre esa URL en Chrome para controlar el bot\n');
+  });
+}
+
+// ─── BOT ────────────────────────────────────────────────────────
+async function startBot() {
+  if (reconectando) return;
+  reconectando = true;
+
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+    const sock = makeWASocket({
+      auth: state,
+      logger: pino({ level: 'silent' }),
+      printQRInTerminal: false,
+      keepAliveIntervalMs: 10000,
+      connectTimeoutMs: 60000,
+      retryRequestDelayMs: 2000,
+    });
+
+    reconectando = false;
+    intentos = 0;
+
+    sock.ev.on('connection.update', (update) => {
+      const { connection, lastDisconnect, qr } = update;
+      if (qr) { console.log('\n📱 Escanea este QR:\n'); qrcode.generate(qr, { small: true }); }
+      if (connection === 'close') {
+        botConectado = false;
+        const code = lastDisconnect?.error?.output?.statusCode;
+        if (code === DisconnectReason.loggedOut) { console.log('❌ Sesión cerrada. Usa panel → Nuevo QR.'); return; }
+        intentos++;
+        if (intentos > MAX_INTENTOS) { fs.rmSync('auth_info', { recursive: true, force: true }); intentos = 0; }
+        const espera = Math.min(intentos * 3000, 15000);
+        console.log('🔄 Reconectando en ' + espera/1000 + 's...');
+        setTimeout(() => { reconectando = false; startBot(); }, espera);
+      }
+      if (connection === 'open') {
+        botConectado = true;
+        console.log('\n✅ ' + BOT_NAME + ' conectado!');
+        console.log('Estado: ' + (config.activo ? '🟢 Activo' : '🔴 Inactivo') + '\n');
+        intentos = 0;
+      }
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+    setInterval(async () => { try { await sock.sendPresenceUpdate('available'); } catch {} }, 30000);
+
+    sock.ev.on('group-participants.update', async ({ id, participants, action }) => {
+      try {
+        if (action === 'remove' || action === 'leave') {
+          stats.salidas++;
+          const frase = frasesRetiro[Math.floor(Math.random() * frasesRetiro.length)];
+          const num = participants[0].replace('@s.whatsapp.net', '');
+          await sock.sendMessage(id, { text: '👋 *' + num + '* acaba de salir.\n\n😂 ' + frase });
+        }
+        if (action === 'add') {
+          stats.entradas++;
+          for (const participant of participants) {
+            const num = participant.replace('@s.whatsapp.net', '');
+            let ppUrl = null;
+            try { ppUrl = await sock.profilePictureUrl(participant, 'image'); } catch {}
+            const welcomeText = '🎉 *¡Bienvenido/a!* 🎉\n\n👤 *Número:* ' + num + '\n🌟 Escribe *!help* para ver los comandos.\n' + FIRMA;
+            if (ppUrl) {
+              await sock.sendMessage(id, { image: { url: ppUrl }, caption: welcomeText, mentions: [participant] });
+            } else {
+              await sock.sendMessage(id, { text: welcomeText, mentions: [participant] });
+            }
+          }
+        }
+      } catch(e) { console.log('Error group:', e.message); }
+    });
+
+    sock.ev.on('messages.upsert', async ({ messages }) => {
+      try {
+        const msg = messages[0];
+        if (!msg.message) return;
+        if (msg.key.fromMe) return;
+        stats.mensajes++;
+
+        const from = msg.key.remoteJid;
+        const senderNumber = from.replace('@s.whatsapp.net', '').replace('@g.us', '');
+        const esOwner = msg.key.participant
+          ? msg.key.participant.replace('@s.whatsapp.net', '') === OWNER_NUMBER
+          : senderNumber === OWNER_NUMBER;
+
+        const texto = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+        const body = texto.trim();
+        const comando = body.split(' ')[0].toLowerCase();
+        const args = body.split(' ').slice(1);
+        const bodyLower = body.toLowerCase();
+        const responder = (text) => sock.sendMessage(from, { text }, { quoted: msg });
+
+        if (esOwner) {
+          if (comando === '!activar') { config.activo = true; saveConfig(); responder('✅ *' + BOT_NAME + ' activado!*\n' + FIRMA); return; }
+          if (comando === '!desactivar') { config.activo = false; saveConfig(); responder('🔴 *' + BOT_NAME + ' desactivado!*\n' + FIRMA); return; }
+          if (comando === '!broadcast') { if (!args.length) return responder('Uso: !broadcast <mensaje>'); responder('📢 ' + args.join(' ') + '\n' + FIRMA); return; }
+          if (comando === '!status') { responder('📊 *' + BOT_NAME + '*\n\n' + (config.activo ? '🟢 Activo' : '🔴 Inactivo') + '\n📨 Mensajes: ' + stats.mensajes + '\n⚡ Comandos: ' + stats.comandos + '\n' + FIRMA); return; }
+          if (comando === '!say') { if (!args.length) return responder('Uso: !say <mensaje>'); sock.sendMessage(from, { text: args.join(' ') }); return; }
+          if (comando === '!ownerhelp') { responder('👑 *Owner:*\n\n🟢 !activar\n🔴 !desactivar\n📢 !broadcast\n📊 !status\n🗣️ !say\n' + FIRMA); return; }
+        }
+
+        if (!config.activo) return;
+        if (comando.startsWith('!')) stats.comandos++;
+
+        if (comando === '!help') { responder('📋 *Comandos:*\n\n🔹 !help\n🔹 !ping\n🔹 !info\n🔹 !hora\n🔹 !dado\n🔹 !chiste\n🔹 !creador\n🔹 !moneda\n🔹 !frase\n🔹 !enamorado\n🔹 !gay\n🔹 !estupido\n🔹 !suerte\n🔹 !calcula\n\n' + FIRMA); return; }
+        if (comando === '!ping') { responder('🏓 Pong! Activo.\n' + FIRMA); return; }
+        if (comando === '!info') { responder('ℹ️ *' + BOT_NAME + '*\n👑 Albert Oficial\n⚙️ Baileys v2.0\n🌎 Perú 🇵🇪\n' + FIRMA); return; }
+        if (comando === '!hora') { responder('🕐 ' + new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' }) + '\n' + FIRMA); return; }
+        if (comando === '!dado') { const r = Math.floor(Math.random()*6)+1; responder('🎲 ' + ['','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣'][r] + ' (' + r + ')\n' + FIRMA); return; }
+        if (comando === '!chiste') { responder('😂 ' + chistes[Math.floor(Math.random()*chistes.length)] + '\n' + FIRMA); return; }
+        if (comando === '!creador') { responder('👑 *Albert Oficial*\nDesarrollador peruano de bots WhatsApp.\n🇵🇪\n' + FIRMA); return; }
+        if (comando === '!moneda') { responder('🪙 ' + (Math.random()<.5?'CARA':'SELLO') + '\n' + FIRMA); return; }
+        if (comando === '!frase') { const f=['El exito es la suma de pequeños esfuerzos.','No te detengas, sigue adelante.','Cree en ti mismo.','Cada dia es una nueva oportunidad.','Tu unico limite eres tu mismo.']; responder('💪 ' + f[Math.floor(Math.random()*f.length)] + '\n' + FIRMA); return; }
+        if (comando === '!enamorado') { const n=Math.floor(Math.random()*101); const b='❤️'.repeat(Math.floor(n/10))+'🖤'.repeat(10-Math.floor(n/10)); const c=n<20?'Eres de piedra. 🗿':n<40?'Algo de sentimientos. 🤏':n<60?'Ni frío ni caliente. 😐':n<80?'Bien enamoradito. 🥰':'¡Perdidamente enamorado! 💘'; responder('💕 *Nivel Enamorado*\n\n'+b+'\n📊 '+n+'%\n\n'+c+'\n'+FIRMA); return; }
+        if (comando === '!gay') { const n=Math.floor(Math.random()*101); const b='🌈'.repeat(Math.floor(n/10))+'⬜'.repeat(10-Math.floor(n/10)); const c=n<20?'Bien machito. 💪':n<40?'Solo curioso. 👀':n<60?'En el medio. 😏':n<80?'Ya casi. 🌈':'Full arcoiris! 🏳️‍🌈'; responder('🌈 *Nivel Gay*\n\n'+b+'\n📊 '+n+'%\n\n'+c+'\n'+FIRMA); return; }
+        if (comando === '!estupido') { const n=Math.floor(Math.random()*101); const b='🧠'.repeat(Math.floor(n/10))+'💀'.repeat(10-Math.floor(n/10)); const c=n<20?'Bastante inteligente. 😏':n<40?'Solo un poco. 😅':n<60?'Nivel intermedio. 🤦':n<80?'Ya preocupa. 😬':'Nivel crítico! 💀'; responder('🧠 *Nivel Estupidez*\n\n'+b+'\n📊 '+n+'%\n\n'+c+'\n'+FIRMA); return; }
+        if (comando === '!suerte') { const n=Math.floor(Math.random()*101); const b='🍀'.repeat(Math.floor(n/10))+'💀'.repeat(10-Math.floor(n/10)); const c=n<20?'Quédate en casa. 🏠':n<40?'No es tu día. 😬':n<60?'Día normal. 😐':n<80?'Bastante suerte! 🍀':'¡Juega la lotería! 🎰'; responder('🍀 *Tu suerte*\n\n'+b+'\n📊 '+n+'%\n\n'+c+'\n'+FIRMA); return; }
+        if (comando === '!calcula') {
+          if (args.length < 3) return responder('Uso: !calcula 10 + 5');
+          const a=parseFloat(args[0]),op=args[1],b=parseFloat(args[2]);
+          if (isNaN(a)||isNaN(b)) return responder('Números inválidos.');
+          let r; if(op==='+')r=a+b; else if(op==='-')r=a-b; else if(op==='*')r=a*b; else if(op==='/')r=b!==0?a/b:'No dividas entre 0'; else return responder('Operación inválida.');
+          responder('🧮 '+a+' '+op+' '+b+' = *'+r+'*\n'+FIRMA); return;
+        }
+        if (bodyLower.includes('hola')||bodyLower.includes('buenas')||bodyLower.includes('alo')) { responder('👋 Hola! Soy *'+BOT_NAME+'*. Escribe *!help*.\n'+FIRMA); return; }
+        if (bodyLower.includes('buenos dias')) { responder('🌅 Buenos días!\n'+FIRMA); return; }
+        if (bodyLower.includes('buenas tardes')) { responder('🌇 Buenas tardes!\n'+FIRMA); return; }
+        if (bodyLower.includes('buenas noches')) { responder('🌙 Buenas noches!\n'+FIRMA); return; }
+        if (bodyLower.includes('gracias')) { responder('🙏 De nada! — Albert Oficial\n'+FIRMA); return; }
+        if (bodyLower.includes('quien eres')||bodyLower.includes('que eres')) { responder('🤖 Soy *'+BOT_NAME+'* por *Albert Oficial*.\n'+FIRMA); return; }
+        if (bodyLower.includes('como estas')||bodyLower.includes('como estás')) { responder('🤖 Al 100%!\n'+FIRMA); return; }
+        if (bodyLower.includes('te quiero')||bodyLower.includes('te amo')) { responder('❤️ Yo también! Soy un bot jaja.\n'+FIRMA); return; }
+        if (bodyLower.includes('aburrido')||bodyLower.includes('aburrida')) { responder('😂 Escribe *!chiste* o *!dado*!\n'+FIRMA); return; }
+
+      } catch(e) { console.log('Error mensaje:', e.message); }
+    });
+
+  } catch(e) {
+    console.log('Error iniciando:', e.message);
+    reconectando = false;
+    setTimeout(() => startBot(), 5000);
+  }
+}
+
+iniciarServidor();
+startBot();

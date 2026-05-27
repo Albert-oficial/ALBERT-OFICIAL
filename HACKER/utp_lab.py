@@ -1,0 +1,166 @@
+import os
+import time
+import random
+from colorama import Fore, init
+
+init(autoreset=True)
+
+os.system("clear")
+
+os.system("toilet -f big 'KALI LINUX'")
+
+banner = r'''
+██╗  ██╗ █████╗ ██╗     ██╗    ██╗     ██╗███╗   ██╗██╗   ██╗██╗  ██╗
+██║ ██╔╝██╔══██╗██║     ██║    ██║     ██║████╗  ██║██║   ██║╚██╗██╔╝
+█████╔╝ ███████║██║     ██║    ██║     ██║██╔██╗ ██║██║   ██║ ╚███╔╝
+██╔═██╗ ██╔══██║██║     ██║    ██║     ██║██║╚██╗██║██║   ██║ ██╔██╗
+██║  ██╗██║  ██║███████╗██║    ███████╗██║██║ ╚████║╚██████╔╝██╔╝ ██╗
+╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝    ╚══════╝╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝  ╚═╝
+'''
+
+print(Fore.RED + banner)
+
+cmd = input(Fore.GREEN + "\nroot@kali-node:~# ")
+
+if cmd == "Certys/*IP,00069220etsxkalix":
+
+    os.system("clear")
+
+    procesos = [
+        "Initializing encrypted node",
+        "Parsing remote metadata",
+        "Analyzing endpoint packets",
+        "Connecting secure transport",
+        "Building telemetry profile",
+        "Scanning infrastructure",
+        "Loading realtime monitor",
+        "Synchronizing relay node",
+        "Accessing distributed cache",
+        "Resolving active session"
+    ]
+
+    for p in procesos:
+        hora = time.strftime("%H:%M:%S")
+        print(Fore.GREEN + f"[{hora}] [+] {p} ... OK")
+        time.sleep(0.35)
+
+    print(Fore.YELLOW + "\n============= PROFILE DATA =============\n")
+
+    datos = [
+
+        ("Nombre", "Daniel Enrique"),
+        ("Apellidos", "Elio Ocampo"),
+
+        ("Padre", "Marco Elio Rodriguez"),
+        ("Madre", "sara ocampo lencina"),
+
+        ("Sexo", "Hombre"),
+        ("Estado", "Soltero"),
+
+        ("Fecha de nacimiento", "29 de Junio del 2001"),
+
+        ("Pais", "Peru"),
+        ("Region", "Lima Metropolitana"),
+        ("Ciudad", "Lima"),
+        ("Distrito", "Ate"),
+
+        ("Ubicacion en tiempo real", "AV Santa Clara / C:09"),
+        ("Proveedor", "INTEGRATEL PERU S.A.A."),
+
+        ("IP Principal", "181.65.214.92"),
+        ("IP Secundaria", "192.168.18.24"),
+
+        ("Operador", "Movistar"),
+
+        ("Linea activa", "+51 975922748"),
+
+        ("Linea secundaria", "+51 916 483 229"),
+        ("Estado linea secundaria", "Pago pendiente S/55"),
+
+        ("Linea adicional", "+51 978 224 610"),
+        ("Estado linea adicional", "Pago pendiente S/37"),
+
+        ("Linea Bitel", "+51 930 551 742"),
+
+        ("Trabajo", "Asistente Tecnico de Redes"),
+
+        ("Registro Administrativo 2023",
+        "Intervencion municipal por alteracion del orden publico y conduccion indebida en zona urbana de Lima Metropolitana"),
+
+        ("Registro Administrativo 2025",
+        "Notificacion preventiva relacionada a incidente vehicular menor y comportamiento inapropiado reportado por vecinos"),
+
+        ("Estado Legal",
+        "Sin procesos judiciales activos registrados en el entorno de laboratorio"),
+
+        ("Colegio", "Colegio Trilce Los Olivos"),
+
+        ("Moto Taxi", "4582-AB"),
+        ("Moto Lineal", "9016-XT"),
+
+        ("Celular 1", "Samsung Galaxy A15"),
+        ("Celular 2", "Redmi Note 13"),
+        ("Celular 3", "Realme C67"),
+
+        ("Laptop", "MacBook Air M4"),
+        ("Direccion MAC", "A4:9F:34:8C:12:7D"),
+        ("CPU", "Apple Silicon M4 10-Core"),
+        ("GPU", "Apple Integrated 10-Core GPU"),
+        ("RAM", "16GB Unified Memory"),
+        ("SSD", "512GB NVMe SSD"),
+        ("Pantalla", "13.6 Liquid Retina IPS"),
+        ("Resolucion", "2560x1664"),
+        ("Sistema", "macOS Sequoia 15.2"),
+        ("Kernel", "Darwin 24.2.0"),
+
+        ("Estado Dispositivo", "ONLINE"),
+
+        ("Observacion",
+        "Perfil ficticio generado para entorno academico y laboratorio tecnico")
+    ]
+
+    for k, v in datos:
+        print(Fore.CYAN + f"[DATA] {k:<28} : {v}")
+        time.sleep(0.12)
+
+    print(Fore.MAGENTA + "\n============= NETWORK STATUS =============\n")
+
+    network = [
+        "TLS_LAYER              : ACTIVE",
+        "REMOTE_NODE            : CONNECTED",
+        "FIREWALL_STATUS        : ENABLED",
+        "TRAFFIC_MONITOR        : ACTIVE",
+        "LATENCY                : 18ms",
+        "PACKET_LOSS            : 0.2%",
+        "PORT_443               : OPEN",
+        "PORT_80                : OPEN",
+        "PORT_22                : FILTERED",
+        "DEVICE_STATUS          : ONLINE"
+    ]
+
+    for n in network:
+        print(Fore.GREEN + n)
+        time.sleep(0.18)
+
+    print(Fore.RED + "\n============= LIVE TELEMETRY =============\n")
+
+    for i in range(20):
+
+        up = random.randint(100,900)
+        down = random.randint(300,1200)
+        lat = random.randint(10,40)
+
+        print(
+            Fore.YELLOW +
+            f"[NODE-{random.randint(1000,9999)}] "
+            f"UP:{up}KB/s "
+            f"DOWN:{down}KB/s "
+            f"LAT:{lat}ms"
+        )
+
+        time.sleep(0.15)
+
+    print(Fore.GREEN + "\n[✓] SESSION COMPLETE")
+
+else:
+    print(Fore.RED + "\n[!] INVALID COMMAND")
