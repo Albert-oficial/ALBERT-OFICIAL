@@ -1,0 +1,10 @@
+node_modules/
+sesion/
+auth-criss/
+sesion_criss/
+session_auth/
+.env
+bot.lock
+db.json
+usuarios.json
+datos/
