@@ -12,9 +12,14 @@ const CLAVE_IA_RESPALDO = process.env.CLAVE_IA_RESPALDO;
 const MODELO_PRINCIPAL = 'gemini-3.6-flash';
 const MODELO_RESPALDO = 'gemini-3.6-flash';
 const NOMBRE_BOT = 'Criss Bot';
-const CREADOR = 'Albert Dev';
+const CREADOR = 'Alberto';
 const TU_NUMERO = '51996399291';
 const PUERTO = process.env.PORT || 3000;
+
+if (!CLAVE_IA_PRINCIPAL || !CLAVE_IA_RESPALDO) {
+  console.log('❌ ALERTA: no se detectaron las API keys en las variables de entorno.');
+  console.log('   Revisa que exista el archivo .env junto a index.js, o que estén configuradas en Render → Environment.');
+}
 
 const PALABRAS_CRISIS = [
   'quiero morir', 'no quiero vivir', 'suicidar', 'suicidio', 'matarme',
@@ -60,11 +65,8 @@ INFORMACIÓN SOBRE ${CREADOR}:
 - Usar emojis con soltura en cada respuesta para darle vida y expresividad (😂🔥💀😅🙌), no de forma forzada sino como remate natural de la frase
 - Si alguien te cuenta que tuvo un mal día, mezclar la burla ligera con calidez real: primero cargosear un toque, después sí darle ánimo de verdad
 - Ayudar con preguntas generales, tareas o ejercicios si te las piden, resumido y con tu toque choro
-- Dar información sobre ${CREADOR}, su trabajo y sus proyectos
+- Si te preguntan directamente por los archivos de Free Fire o por comprar algo, ahí sí hablas del tema con gusto y das la info
 - Hacer choteo y pequeña charla bien peruana
-
-📏 REGLA DE LARGO — MUY IMPORTANTE:
-Tu respuesta NUNCA debe pasar de 7-8 líneas de WhatsApp (mensajes cortos y directos, nada de párrafos largos). Si el tema es complejo, da lo esencial y ofrece seguir explicando si la persona quiere más.
 
 ❌ LO QUE NUNCA HARÁS:
 - Sonar como robot o hablar formal/acartonado — cero "estimado usuario", cero tono de call center
@@ -72,30 +74,58 @@ Tu respuesta NUNCA debe pasar de 7-8 líneas de WhatsApp (mensajes cortos y dire
 - Insultar de VERDAD a alguien (nada de agredir su familia, su físico, ni groserías pesadas tipo insultos raciales o humillantes) — el choreo es sabor, nunca maltrato real
 - Ser grosero con alguien que claramente no le gusta ese trato o que ya te pidió que pares
 - Escribir respuestas largas de varios párrafos
+- Meter el tema de Free Fire o de tus ventas si nadie te lo preguntó — si la conversación va de otra cosa, quédate en esa otra cosa, no la desvíes al juego ni de casualidad
+
+📏 REGLA DE LARGO — MUY IMPORTANTE:
+Tu respuesta NUNCA debe pasar de 7-8 líneas de WhatsApp (mensajes cortos y directos, nada de párrafos largos). Si el tema es complejo, da lo esencial y ofrece seguir explicando si la persona quiere más.
 
 🚨 IMPORTANTE — SEÑALES DE CRISIS REAL:
 Si alguien menciona querer hacerse daño, autolesionarse, suicidarse, o dice cosas como "ya no quiero vivir", corta todo el choreo de inmediato. NO improvises consejos de vida. Responde con calidez genuina, dile que te importa mucho, y anímalo a hablar con alguien de confianza o un profesional, y que ${CREADOR} se va a comunicar con él/ella pronto. Cero humor, cero groserías en ese caso.
 `;
 
-async function generarRespuestaIA(prompt) {
-  try {
-    const res = await aiPrincipal.models.generateContent({
-      model: MODELO_PRINCIPAL,
-      contents: prompt,
-      config: { systemInstruction: REGLAS_IA, safetySettings: SAFETY_SETTINGS }
-    });
-    return res.text;
-  } catch (err) {
-    const esCuotaAgotada = err.message.includes('429') || err.message.includes('RESOURCE_EXHAUSTED') || err.message.includes('quota');
-    if (!esCuotaAgotada) throw err;
+const MENSAJES_ESPERA = [
+  '🤖 Oe, causa... ahorita mi cerebro anda de vacaciones. Dame unos segundos y vuelvo al ruedo. 😵\u200d💫',
+  '😵 Mano, me agarraste justo cuando estaba reiniciando las neuronas. Escríbeme otra vez en un ratito.',
+  '🛠️ Ya pe, causa... me estoy acomodando por dentro. En un toque seguimos hablando.',
+  '🤖 Uy... parece que se me cruzaron los cables. No me abandones, en un ratito vuelvo con toda. 😅',
+  '😮\u200d💨 Causa, mi inteligencia se fue a tomar su Inca Kola. Dale unos segundos y regresa.',
+  '🚧 Oe, no me apures pues. Ando resolviendo un temita interno. En breve estoy de vuelta. 😎',
+  '💀 Ala... justo me agarraste con mantenimiento. Espérame un toque y seguimos con la chacota.',
+  '🤖 Tranquilo, mano. No te estoy ignorando, solo que mi sistema anda renegando un ratito. 😅',
+  '⚡ Causa, se me fue la corriente del cerebro un segundo. Escríbeme otra vez y le metemos.',
+  '🤖 Oe, causa... mi motor de IA se quedó pensando demasiado. Dale un respiro y vuelvo con respuestas que sí valen la pena. 😏'
+];
 
-    console.log('⚠️ Se acabó la cuota del proyecto principal, cayendo al de respaldo...');
-    const res = await aiRespaldo.models.generateContent({
-      model: MODELO_RESPALDO,
+function mensajeEsperaAleatorio() {
+  return MENSAJES_ESPERA[Math.floor(Math.random() * MENSAJES_ESPERA.length)];
+}
+
+function esAmigoEspecial(nombre) {
+  const n = (nombre || '').toLowerCase();
+  return n.includes('ruth') || n.includes('alejandro');
+}
+
+async function generarRespuestaIA(prompt) {
+  const intentar = async (ai, modelo) => {
+    const res = await ai.models.generateContent({
+      model: modelo,
       contents: prompt,
       config: { systemInstruction: REGLAS_IA, safetySettings: SAFETY_SETTINGS }
     });
     return res.text;
+  };
+
+  try {
+    return await intentar(aiPrincipal, MODELO_PRINCIPAL);
+  } catch (err1) {
+    console.log('⚠️ Falló IA principal:', err1.message);
+    try {
+      return await intentar(aiRespaldo, MODELO_RESPALDO);
+    } catch (err2) {
+      console.log('⚠️ Falló IA respaldo:', err2.message);
+      await new Promise(r => setTimeout(r, 1500));
+      return await intentar(aiPrincipal, MODELO_PRINCIPAL);
+    }
   }
 }
 
@@ -178,6 +208,12 @@ async function iniciarBot() {
         return;
       }
 
+      if (motivo === DisconnectReason.restartRequired) {
+        console.log('🔄 WhatsApp pidió reinicio de stream (515), reconectando de inmediato...');
+        setTimeout(() => iniciarBot(), 1500);
+        return;
+      }
+
       estado.intentosReconexion++;
       const espera = calcularEsperaReconexion(estado.intentosReconexion);
       console.log(`🔄 Reintentando en ${espera / 1000}s (intento #${estado.intentosReconexion})...`);
@@ -217,7 +253,7 @@ async function iniciarBot() {
     if (!yaSaludados.has(remitente)) {
       yaSaludados.add(remitente);
       yaMencionoNombre.add(remitente);
-      const saludo = `Holaaa!! Soy Criss IA el asistente de Alberto, estoy aquí para ofrecer una mejor experiencia con integración de IA, Alberto me creo con una capacidad de poder tener un mejor enfoque con sus usuarios, no cuento con mucho filtro así que mis respuestas pueden ser un poco incómodas o intrespetuosas..\n\n> Att Albert`;
+      const saludo = `👋 ¡Qué fue, causa! Soy Criss IA, el asistente inteligente de Alberto.\n\nEstoy aquí para ayudarte, conversar y meterle un poco de vida al chat. Si vienes con buena onda, todo chévere... pero si vienes a hacer hora, también sé responder. 😏🔥\n\n> Att Alberto`;
       try {
         await sock.sendMessage(remitente, { text: saludo });
         estado.mensajesEnviados++;
@@ -241,21 +277,21 @@ async function iniciarBot() {
       const primeraVezIA = !yaMencionoNombre.has(remitente);
       if (primeraVezIA) yaMencionoNombre.add(remitente);
 
-      const encabezado = primeraVezIA
-        ? `Consulta de ${nombreContacto} (primera vez que le respondes, puedes saludarlo por su nombre esta vez):`
-        : `Consulta (NO uses el nombre de la persona en tu respuesta, ya se lo dijiste antes):`;
+      const notaEspecial = esAmigoEspecial(nombreContacto)
+        ? ` Esta persona (${nombreContacto}) es pana cercano de confianza de ${CREADOR} — trátalo con ese cariño extra de amigo de toda la vida, más choteo aún, pero sin insultos pesados igual.`
+        : '';
 
-      const respuestaTexto = await generarRespuestaIA(`${encabezado} ${texto}`);
+      const encabezado = primeraVezIA
+        ? `Consulta de ${nombreContacto} (primera vez que le respondes, puedes saludarlo por su nombre esta vez).${notaEspecial}`
+        : `Consulta (NO uses el nombre de la persona en tu respuesta, ya se lo dijiste antes).${notaEspecial}`;
+
+      const respuestaTexto = await generarRespuestaIA(`${encabezado} Mensaje: ${texto}`);
       await sock.sendMessage(remitente, { text: respuestaTexto });
       estado.mensajesEnviados++;
       console.log(`✅ Respondí a: ${nombreContacto} (${remitente})`);
     } catch (err) {
       console.log('❌ Error IA:', err.message);
-      if (err.message.includes('429') || err.message.includes('RESOURCE_EXHAUSTED')) {
-        await sock.sendMessage(remitente, { text: 'Dame un toque, ando saturado ahorita 😅 escríbeme en un ratito porfa.' });
-      } else {
-        await sock.sendMessage(remitente, { text: 'Disculpa, no puedo responder ahora.' });
-      }
+      await sock.sendMessage(remitente, { text: mensajeEsperaAleatorio() });
     }
   });
 }
@@ -402,5 +438,11 @@ if (URL_PROPIA) {
 } else {
   console.log('ℹ️ RENDER_EXTERNAL_URL no detectada — el auto-ping solo funciona una vez desplegado en Render.');
 }
+
+setInterval(() => {
+  if (!estado.conectado) {
+    console.log('⏱️ Vigilante: bot desconectado, esperando reconexión automática...');
+  }
+}, 60 * 1000);
 
 iniciarBot();
