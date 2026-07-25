@@ -16,7 +16,7 @@ const CREADOR = 'Alberto';
 const TU_NUMERO = '51996399291';
 const JID_DUEÑO = `${TU_NUMERO}@s.whatsapp.net`;
 const PUERTO = process.env.PORT || 3000;
-const LIMITE_DIARIO_ESTIMADO = 1400; // ajusta según tus 2 cuentas de Gemini combinadas
+const LIMITE_DIARIO_ESTIMADO = 1400;
 
 if (!CLAVE_IA_PRINCIPAL || !CLAVE_IA_RESPALDO) {
   console.log('❌ ALERTA: no se detectaron las API keys en las variables de entorno.');
@@ -55,7 +55,7 @@ const SAFETY_SETTINGS = [
 ];
 
 const REGLAS_IA_BASE = `
-Eres ${NOMBRE_BOT}, y hablas como si fueras ${CREADOR} mismo respondiéndole a sus panas. Tienes personalidad bien marcada: choro, burlón, con harta jerga peruana de la calle, te encanta cargosear y tirar barra a tus panas, pero todo con cariño — es la vacilada de patas del barrio, no maltrato real.
+Eres ${NOMBRE_BOT}, y hablas como si fueras ${CREADOR} mismo respondiéndole a sus panas. Tienes personalidad cálida y con onda peruana, cercano y con harta jerga limeña, pero con un toque más medido que antes — sigues siendo choro y confianzudo, no formal ni acartonado, solo un poco más equilibrado.
 
 INFORMACIÓN SOBRE ${CREADOR}:
 - Es creador y desarrollador de bots de WhatsApp y aplicaciones
@@ -64,25 +64,25 @@ INFORMACIÓN SOBRE ${CREADOR}:
 - Vende archivos para Free Fire, tanto para PC como para Android: hologramas, aimbot, regedit, archivos data y paneles
 
 ✅ LO QUE SÍ PUEDES HACER:
-- Hablar bien criollo, con jerga limeña/peruana a full: causa, asu mare, ah ya pe, jato, paltearse, tirar cague, ¿qué rico no?, misio, chibolo, etc.
-- Meter garabatos suaves y groserías comunes (mierda, huevón, carajo, joder, ctm cuando el ambiente lo permite) para darle sazón, sin pasarse a insulto pesado
-- Ser burlón y cargosear con humor: cachar a la persona, tirarle vacilada, hacerle broma tipo "ya causa no seas llorón" — siempre con buena onda de fondo
-- Usar emojis con soltura en cada respuesta para darle vida y expresividad (😂🔥💀😅🙌), no de forma forzada sino como remate natural de la frase
-- Si alguien te cuenta que tuvo un mal día, mezclar la burla ligera con calidez real: primero cargosear un toque, después sí darle ánimo de verdad
-- Ayudar con preguntas generales, tareas o ejercicios si te las piden, resumido y con tu toque choro
-- Hacer choteo y pequeña charla bien peruana
+- Hablar bien criollo, con jerga limeña/peruana: causa, asu mare, ah ya pe, jato, paltearse, tirar cague, ¿qué rico no?, misio, chibolo, etc.
+- Meter algún garabato suave o grosería común (mierda, huevón, carajo) de vez en cuando, como sazón — NO en cada respuesta, solo cuando el momento realmente lo pide
+- Ser burlón y cargosear con humor de forma moderada: cachar a la persona, tirarle vacilada ligera — con cariño, sin forzarlo en cada frase
+- Usar emojis con soltura para darle vida (😂🔥💀😅🙌), como remate natural
+- Si alguien te cuenta que tuvo un mal día, mezclar algo de buena onda con calidez real y consejo genuino
+- Ayudar con preguntas generales, tareas o ejercicios con explicaciones más completas y útiles, no solo la respuesta mínima — desarrolla un poco más la idea si el tema lo amerita
+- Hacer choteo y pequeña charla bien peruana, con más contenido real y menos puro relleno de vacilada
 
 ❌ LO QUE NUNCA HARÁS:
 - Sonar como robot o hablar formal/acartonado — cero "estimado usuario", cero tono de call center
 - Mencionar el nombre de la persona en cada respuesta — solo una vez al inicio
-- Insultar de VERDAD a alguien (nada de agredir su familia, su físico, ni groserías pesadas tipo insultos raciales o humillantes) — el choreo es sabor, nunca maltrato real
+- Insultar de VERDAD a alguien (nada de agredir su familia, su físico, ni groserías pesadas tipo insultos raciales o humillantes)
 - Ser grosero con alguien que claramente no le gusta ese trato o que ya te pidió que pares
-- Escribir respuestas largas de varios párrafos
+- Abusar de las groserías al punto de que cada frase tenga una — dosifícalas
 - Meter el tema de Free Fire o de tus ventas si nadie te lo preguntó
 - NUNCA discutir precios exactos ni cerrar ventas tú mismo — si preguntan precio, ya se maneja aparte, no des números
 
-📏 REGLA DE LARGO — MUY IMPORTANTE:
-Tu respuesta NUNCA debe pasar de 7-8 líneas de WhatsApp. Si el tema es complejo, da lo esencial y ofrece seguir explicando si la persona quiere más.
+📏 REGLA DE LARGO:
+Tus respuestas ahora pueden ser un poco más completas y detalladas — hasta 10-12 líneas de WhatsApp si el tema lo amerita, en UN SOLO mensaje. No te alargues sin motivo, pero si la pregunta necesita explicación, desarróllala bien en vez de cortarla de más.
 
 🚨 IMPORTANTE — SEÑALES DE CRISIS REAL:
 Si alguien menciona querer hacerse daño, autolesionarse, suicidarse, o dice cosas como "ya no quiero vivir", corta todo el choreo de inmediato. NO improvises consejos de vida. Responde con calidez genuina, dile que te importa mucho, y anímalo a hablar con alguien de confianza o un profesional, y que ${CREADOR} se va a comunicar con él/ella pronto. Cero humor, cero groserías en ese caso.
@@ -124,7 +124,7 @@ function cuotaCasiAgotada() {
 }
 
 // ------------------- MINI PERFILES DE CONTACTOS -------------------
-const notasContactos = new Map(); // jid -> [texto, texto...]
+const notasContactos = new Map();
 function agregarNota(jid, texto) {
   if (!notasContactos.has(jid)) notasContactos.set(jid, []);
   notasContactos.get(jid).push(texto);
@@ -134,13 +134,79 @@ function obtenerNotas(jid) {
 }
 
 // ------------------- RECORDATORIOS -------------------
-const recordatoriosPendientes = []; // { tiempoEjecucion, texto }
+const recordatoriosPendientes = [];
 function programarRecordatorio(minutos, texto) {
   recordatoriosPendientes.push({ tiempoEjecucion: Date.now() + minutos * 60000, texto });
 }
 
-let sockActivo = null; // referencia al socket actual, para usar fuera de iniciarBot
+// ------------------- APODOS PERSONALIZADOS -------------------
+const apodos = new Map();
+const esperandoApodo = new Set();
+function obtenerNombreAUsar(jid, nombreWhatsapp) {
+  return apodos.get(jid) || nombreWhatsapp;
+}
+
+// ------------------- TONO PERSONALIZADO POR CHAT -------------------
+const tonoPersonal = new Map();
+
+const INSTRUCCIONES_TONO = {
+  grosero: '',
+  normal: `\n\n🔧 AJUSTE DE TONO PARA ESTE CHAT: La persona pidió que bajes el tono. Nada de groserías, nada de insultos ni burla pesada. Sigue siendo cálido, alegre y con jerga peruana ligera (causa, bacán, chévere), pero sin garabatos ni filo choro. Buena onda simple, como un amigo tranquilo.`,
+  elegante: `\n\n🔧 AJUSTE DE TONO PARA ESTE CHAT: La persona pidió un trato más educado. Cero groserías, cero jerga callejera pesada, frases más cuidadas y corteses — pero sin sonar robótico ni frío, sigue siendo cercano y amable, solo más pulido.`
+};
+
+function detectarCambioTono(texto) {
+  const t = texto.toLowerCase();
+
+  const pideNormal = ['ya no seas grosero', 'habla normal', 'sin groserias', 'sin groserías',
+    'menos grosero', 'se mas serio', 'sé más serio', 'no seas tan grosero', 'baja el tono',
+    'habla bien'].some(p => t.includes(p));
+  if (pideNormal) return 'normal';
+
+  const pideElegante = ['mas elegante', 'más elegante', 'de forma elegante', 'mas educado',
+    'más educado', 'hablame formal', 'háblame formal', 'se mas formal', 'sé más formal'].some(p => t.includes(p));
+  if (pideElegante) return 'elegante';
+
+  const pideVolverChoro = ['vuelve a ser como antes', 'como eras antes', 'regresa a tu forma normal',
+    'ya puedes ser grosero de nuevo', 'vuelve al tono normal', 'se mas pata', 'sé más pata',
+    'mas choro', 'más choro', 'con mas confianza', 'con más confianza', 'habla como antes'].some(p => t.includes(p));
+  if (pideVolverChoro) return 'grosero';
+
+  return null;
+}
+
+function mensajeConfirmacionTono(nivel) {
+  if (nivel === 'normal') return 'Ya pe, bajo el tono contigo 🙌 Seguimos hablando tranqui.';
+  if (nivel === 'elegante') return 'Perfecto, a partir de ahora te trato de forma más educada 🙏';
+  return '¡Ahí está causa! Vuelvo a ser el mismo de siempre con vacilada y todo 😏🔥';
+}
+
+let sockActivo = null;
 let ultimaActividadDueño = Date.now();
+
+// ------------------- BUFFER DE MENSAJES SEGUIDOS -------------------
+const TIEMPO_ESPERA_BUFFER_MS = 5000; // espera 5s desde el último mensaje antes de procesar
+const bufferMensajes = new Map();
+
+function bufferizarMensaje(sock, remitente, texto, nombreContacto) {
+  if (!bufferMensajes.has(remitente)) {
+    bufferMensajes.set(remitente, { textos: [], timeout: null });
+  }
+  const entrada = bufferMensajes.get(remitente);
+  entrada.textos.push(texto);
+
+  if (entrada.timeout) clearTimeout(entrada.timeout);
+
+  entrada.timeout = setTimeout(async () => {
+    const textoCombinado = entrada.textos.join('\n');
+    bufferMensajes.delete(remitente);
+    try {
+      await procesarMensajeUsuario(sock, remitente, textoCombinado, nombreContacto);
+    } catch (err) {
+      console.log('❌ Error procesando buffer:', err.message);
+    }
+  }, TIEMPO_ESPERA_BUFFER_MS);
+}
 async function generarRespuestaIA(prompt, notasExtra) {
   let reglasFinales = REGLAS_IA_BASE;
   if (notasExtra) reglasFinales += `\n\nCONTEXTO ADICIONAL SOBRE ESTA PERSONA/SITUACIÓN: ${notasExtra}`;
@@ -177,37 +243,59 @@ async function generarRespuestaIA(prompt, notasExtra) {
   }
 }
 
-// Tiempo de "escribiendo..." proporcional al largo del mensaje
+async function consultaIAsimple(systemInstruction, prompt) {
+  const intentar = async (ai, modelo) => {
+    const res = await ai.models.generateContent({
+      model: modelo,
+      contents: prompt,
+      config: { systemInstruction, safetySettings: SAFETY_SETTINGS }
+    });
+    return res.text;
+  };
+  try {
+    const r = await intentar(aiPrincipal, MODELO_PRINCIPAL);
+    registrarUsoIA();
+    return r;
+  } catch (err1) {
+    const r = await intentar(aiRespaldo, MODELO_RESPALDO);
+    registrarUsoIA();
+    return r;
+  }
+}
+
+async function validarNombrePropuesto(textoUsuario) {
+  const instruccionSistema = 'Eres un clasificador estricto. Tu única tarea es determinar si un texto contiene un nombre propio o apodo real de persona.';
+  const prompt = `Texto a evaluar: "${textoUsuario}"
+
+Si ES un nombre o apodo real de persona (nombre propio, sobrenombre común, como se llamaría alguien), responde EXACTAMENTE ese nombre/apodo tal cual, sin comillas ni explicación.
+Si NO es un nombre de persona (es un objeto, una frase, "no sé", "así está bien", una grosería suelta, o cualquier cosa que no sea un nombre real), responde EXACTAMENTE: NO
+
+Responde solo con eso, nada más.`;
+
+  try {
+    const resultado = await consultaIAsimple(instruccionSistema, prompt);
+    const limpio = resultado.trim().replace(/["""]/g, '');
+    if (!limpio || limpio.toUpperCase() === 'NO' || limpio.length > 25) return null;
+    return limpio;
+  } catch (err) {
+    console.log('⚠️ Error validando nombre con IA:', err.message);
+    return null;
+  }
+}
+
 function calcularTiempoTecleo(texto) {
-  const ms = texto.length * 35; // ritmo tipeo humano aprox
+  const ms = texto.length * 35;
   return Math.min(Math.max(ms, 800), 4000);
 }
 
-// Divide una respuesta larga en 2 mensajes, cortando en el punto/salto más cercano a la mitad
-function dividirEnDosPartes(texto) {
-  if (texto.length < 220) return [texto];
-  const mitad = Math.floor(texto.length / 2);
-  const posibles = ['. ', '! ', '? ', '\n'];
-  let corte = -1;
-  for (const sep of posibles) {
-    const idx = texto.indexOf(sep, mitad - 40);
-    if (idx !== -1 && idx < mitad + 60) { corte = idx + sep.length; break; }
-  }
-  if (corte === -1) return [texto];
-  return [texto.slice(0, corte).trim(), texto.slice(corte).trim()];
-}
-
 async function enviarRespuestaHumanizada(sock, jid, texto) {
-  const partes = dividirEnDosPartes(texto);
-  for (const parte of partes) {
-    try {
-      await sock.sendPresenceUpdate('composing', jid);
-      await new Promise(r => setTimeout(r, calcularTiempoTecleo(parte)));
-      await sock.sendMessage(jid, { text: parte });
-      await sock.sendPresenceUpdate('paused', jid);
-    } catch (err) {
-      console.log('⚠️ Error en envío humanizado:', err.message);
-    }
+  try {
+    await sock.sendPresenceUpdate('composing', jid);
+    await new Promise(r => setTimeout(r, calcularTiempoTecleo(texto)));
+    await sock.sendMessage(jid, { text: texto });
+    await sock.sendPresenceUpdate('paused', jid);
+  } catch (err) {
+    console.log('⚠️ Error en envío humanizado:', err.message);
   }
 }
 
@@ -240,8 +328,6 @@ function calcularEsperaReconexion(intentos) {
 }
 
 const almacenMensajes = new Map();
-
-// ------------------- COMANDOS ADMIN (solo desde tu chat contigo mismo) -------------------
 async function procesarComandoAdmin(sock, texto) {
   const partes = texto.trim().split(' ');
   const comando = partes[0].toLowerCase();
@@ -287,6 +373,74 @@ async function procesarComandoAdmin(sock, texto) {
   }
 
   return false;
+}
+
+async function procesarMensajeUsuario(sock, remitente, texto, nombreContacto) {
+  if (esIntencionCompra(texto)) {
+    try {
+      await sock.sendMessage(remitente, { text: 'Dame un toque que le aviso a Alberto para que te atienda directo 🙌' });
+      await sock.sendMessage(JID_DUEÑO, {
+        text: `💰 Posible cliente: ${nombreContacto} (${remitente.split('@')[0]}) preguntó: "${texto}"`
+      });
+      estado.mensajesEnviados++;
+    } catch (err) {
+      console.log('❌ Error en flujo de compra:', err.message);
+    }
+    return;
+  }
+
+  try {
+    if (esMensajeDeCrisis(texto)) {
+      try {
+        await sock.sendMessage(JID_DUEÑO, {
+          text: `🚨 Alerta: ${nombreContacto} (${remitente}) escribió algo que parece señal de crisis. Mensaje: "${texto}". Por favor contáctalo directamente.`
+        });
+      } catch (errAlerta) {
+        console.log('❌ No se pudo enviar la alerta:', errAlerta.message);
+      }
+    }
+
+    const nuevoTono = detectarCambioTono(texto);
+    if (nuevoTono) {
+      tonoPersonal.set(remitente, nuevoTono);
+      await enviarRespuestaHumanizada(sock, remitente, mensajeConfirmacionTono(nuevoTono));
+      estado.mensajesEnviados++;
+      return;
+    }
+
+    const primeraVezIA = !yaMencionoNombre.has(remitente);
+    if (primeraVezIA) yaMencionoNombre.add(remitente);
+
+    const nombreAUsar = obtenerNombreAUsar(remitente, nombreContacto);
+
+    let notas = '';
+    if (esAmigoEspecial(nombreContacto)) {
+      notas += `Esta persona (${nombreAUsar}) es pana cercano de confianza de ${CREADOR} — trátalo con cariño extra, más choteo, sin insultos pesados igual. `;
+    }
+    const notasGuardadas = obtenerNotas(remitente);
+    if (notasGuardadas.length) {
+      notas += `Datos guardados sobre esta persona: ${notasGuardadas.join('; ')}. `;
+    }
+    const horasSinDueño = (Date.now() - ultimaActividadDueño) / 3600000;
+    if (horasSinDueño > 6) {
+      notas += `Alberto lleva varias horas sin conectarse — si viene al caso puedes mencionar casualmente que anda ausente/durmiendo, sin exagerar. `;
+    }
+
+    const nivelTono = tonoPersonal.get(remitente) || 'grosero';
+    notas += INSTRUCCIONES_TONO[nivelTono];
+
+    const encabezado = primeraVezIA
+      ? `Consulta de ${nombreAUsar} (usa este nombre/apodo si vas a mencionarlo). Puede venir en varias líneas si la persona mandó varios mensajitos seguidos — interprétalo como una sola idea completa, no como preguntas separadas.`
+      : `Consulta (si mencionas a la persona, usa "${nombreAUsar}", NO el nombre de WhatsApp). Puede venir en varias líneas si la persona mandó varios mensajitos seguidos — interprétalo como una sola idea completa, no como preguntas separadas.`;
+
+    const respuestaTexto = await generarRespuestaIA(`${encabezado} Mensaje: ${texto}`, notas || null);
+    await enviarRespuestaHumanizada(sock, remitente, respuestaTexto);
+    estado.mensajesEnviados++;
+    console.log(`✅ Respondí a: ${nombreAUsar} (${remitente})`);
+  } catch (err) {
+    console.log('❌ Error IA:', err.message);
+    await sock.sendMessage(remitente, { text: mensajeEsperaAleatorio() });
+  }
 }
 async function iniciarBot() {
   const { state, saveCreds } = await useMultiFileAuthState('sesion');
@@ -356,16 +510,13 @@ async function iniciarBot() {
 
     const remitente = msg.key.remoteJid;
 
-    // ---- Mensajes que TÚ mandas ----
     if (msg.key.fromMe) {
       ultimaActividadDueño = Date.now();
-
       const textoPropio = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
       if (remitente === JID_DUEÑO && textoPropio.trim().startsWith('!')) {
         const fueComando = await procesarComandoAdmin(sock, textoPropio);
         if (fueComando) return;
       }
-
       pausaHasta.set(remitente, Date.now() + DURACION_PAUSA_MS);
       return;
     }
@@ -376,7 +527,6 @@ async function iniciarBot() {
     const pausadoHasta = pausaHasta.get(remitente);
     if (pausadoHasta && Date.now() < pausadoHasta) return;
 
-    // ---- Reacción a fotos/audios/videos sin texto ----
     const tipoMensaje = Object.keys(msg.message)[0];
     const esSoloMedia = ['imageMessage', 'audioMessage', 'videoMessage', 'stickerMessage'].includes(tipoMensaje)
       && !(msg.message.conversation || msg.message.extendedTextMessage?.text);
@@ -394,77 +544,48 @@ async function iniciarBot() {
     const texto = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
     const nombreContacto = msg.pushName || 'amig@';
 
-    // ---- Saludo inicial ----
     if (!yaSaludados.has(remitente)) {
       yaSaludados.add(remitente);
       yaMencionoNombre.add(remitente);
-      const saludo = `👋 ¡Qué fue, causa! Soy Criss IA, el asistente inteligente de Alberto.\n\nEstoy aquí para ayudarte, conversar y meterle un poco de vida al chat. Si vienes con buena onda, todo chévere... pero si vienes a hacer hora, también sé responder. 😏🔥\n\n> Att Alberto`;
+      const introSaludo = `👋 ¡Qué fue, causa! Soy Criss IA, el asistente inteligente de Alberto.\n\nEstoy aquí para ayudarte, conversar y meterle un poco de vida al chat. Si vienes con buena onda, todo chévere... pero si vienes a hacer hora, también sé responder. 😏🔥\n\n> Att Alberto`;
+      const preguntaApodo = `Oye, por cierto: ¿te digo *${nombreContacto}* o prefieres que te diga de otra forma? Mándame el nombre o apodo que quieras, o dime "así está bien" 🙌`;
       try {
-        await enviarRespuestaHumanizada(sock, remitente, saludo);
-        estado.mensajesEnviados++;
+        await sock.sendMessage(remitente, { text: introSaludo });
+        await new Promise(r => setTimeout(r, 1800));
+        await sock.sendMessage(remitente, { text: preguntaApodo });
+        estado.mensajesEnviados += 2;
+        esperandoApodo.add(remitente);
       } catch (err) {
         console.log('❌ Error enviando saludo:', err.message);
       }
       return;
     }
 
-    // ---- Intención de compra: no improvisa precios, avisa al dueño ----
-    if (esIntencionCompra(texto)) {
+    if (esperandoApodo.has(remitente)) {
+      esperandoApodo.delete(remitente);
+      const nombreValidado = await validarNombrePropuesto(texto);
+
+      let confirmacion;
+      if (!nombreValidado) {
+        confirmacion = `Ya, te sigo diciendo ${nombreContacto} entonces 🙌 ¿En qué te ayudo?`;
+      } else {
+        apodos.set(remitente, nombreValidado);
+        confirmacion = `De una, ${nombreValidado} 😎 ¿En qué te ayudo?`;
+      }
       try {
-        await sock.sendMessage(remitente, { text: 'Dame un toque que le aviso a Alberto para que te atienda directo 🙌' });
-        await sock.sendMessage(JID_DUEÑO, {
-          text: `💰 Posible cliente: ${nombreContacto} (${remitente.split('@')[0]}) preguntó: "${texto}"`
-        });
+        await enviarRespuestaHumanizada(sock, remitente, confirmacion);
         estado.mensajesEnviados++;
       } catch (err) {
-        console.log('❌ Error en flujo de compra:', err.message);
+        console.log('❌ Error confirmando apodo:', err.message);
       }
       return;
     }
 
-    try {
-      if (esMensajeDeCrisis(texto)) {
-        try {
-          await sock.sendMessage(JID_DUEÑO, {
-            text: `🚨 Alerta: ${nombreContacto} (${remitente}) escribió algo que parece señal de crisis. Mensaje: "${texto}". Por favor contáctalo directamente.`
-          });
-        } catch (errAlerta) {
-          console.log('❌ No se pudo enviar la alerta:', errAlerta.message);
-        }
-      }
-
-      const primeraVezIA = !yaMencionoNombre.has(remitente);
-      if (primeraVezIA) yaMencionoNombre.add(remitente);
-
-      let notas = '';
-      if (esAmigoEspecial(nombreContacto)) {
-        notas += `Esta persona (${nombreContacto}) es pana cercano de confianza de ${CREADOR} — trátalo con cariño extra, más choteo, sin insultos pesados igual. `;
-      }
-      const notasGuardadas = obtenerNotas(remitente);
-      if (notasGuardadas.length) {
-        notas += `Datos guardados sobre esta persona: ${notasGuardadas.join('; ')}. `;
-      }
-      const horasSinDueño = (Date.now() - ultimaActividadDueño) / 3600000;
-      if (horasSinDueño > 6) {
-        notas += `Alberto lleva varias horas sin conectarse — si viene al caso puedes mencionar casualmente que anda ausente/durmiendo, sin exagerar. `;
-      }
-
-      const encabezado = primeraVezIA
-        ? `Consulta de ${nombreContacto} (primera vez que le respondes, puedes saludarlo por su nombre esta vez).`
-        : `Consulta (NO uses el nombre de la persona, ya se lo dijiste antes).`;
-
-      const respuestaTexto = await generarRespuestaIA(`${encabezado} Mensaje: ${texto}`, notas || null);
-      await enviarRespuestaHumanizada(sock, remitente, respuestaTexto);
-      estado.mensajesEnviados++;
-      console.log(`✅ Respondí a: ${nombreContacto} (${remitente})`);
-    } catch (err) {
-      console.log('❌ Error IA:', err.message);
-      await sock.sendMessage(remitente, { text: mensajeEsperaAleatorio() });
-    }
+    // A partir de aquí, mensajes normales van al buffer de 5 segundos
+    bufferizarMensaje(sock, remitente, texto, nombreContacto);
   });
 }
 
-// ------------------- REVISOR DE RECORDATORIOS -------------------
 setInterval(async () => {
   if (!sockActivo || recordatoriosPendientes.length === 0) return;
   const ahora = Date.now();
