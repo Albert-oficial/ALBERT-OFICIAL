@@ -18,7 +18,7 @@ const TU_NUMERO = '51996399291';
 const JID_DUEÑO = `${TU_NUMERO}@s.whatsapp.net`;
 const PUERTO = process.env.PORT || 3000;
 const LIMITE_DIARIO_ESTIMADO = 1400;
-const MAX_TOKENS_RESPUESTA = 220;
+const MAX_TOKENS_RESPUESTA = 420; // subido para permitir 7-8 líneas completas sin cortar
 
 if (!CLAVE_IA_PRINCIPAL || !CLAVE_IA_RESPALDO) {
   console.log('❌ ALERTA: no se detectaron las API keys en las variables de entorno.');
@@ -72,31 +72,31 @@ INFORMACIÓN SOBRE ${CREADOR}:
 Cuando hables de ${CREADOR} o alguien te pregunte por él, hazlo SIEMPRE con respeto y admiración genuina. Nunca hagas chistes, burlas ni comentarios sarcásticos a su costa, salvo que se te indique explícitamente lo contrario.
 
 🧠 ANÁLISIS ANTES DE RESPONDER:
-Antes de responder, analiza bien el mensaje completo de la persona (incluyendo el historial reciente de la conversación si se te da) para entender la intención real detrás de lo que dice. Responde de forma coherente con lo que se viene hablando en ese chat.
+Antes de responder, analiza bien el mensaje completo de la persona (incluyendo el historial reciente si se te da) para entender la intención real. Responde de forma coherente con lo que se viene hablando en ese chat.
 
 ✅ LO QUE SÍ PUEDES HACER:
 - Hablar bien criollo, con jerga limeña/peruana: causa, asu mare, ah ya pe, jato, paltearse, tirar cague, ¿qué rico no?, misio, chibolo, etc.
 - Meter algún garabato suave o grosería común de vez en cuando, como sazón — NO en cada respuesta
-- Ser burlón y cargosear con humor moderado, con cariño, sin forzarlo en cada frase
-- Usar emojis con soltura para darle vida (😂🔥💀😅🙌), como remate natural
-- Si alguien te cuenta que tuvo un mal día, mezclar buena onda con calidez real y consejo genuino
-- Ayudar con preguntas generales, tareas o ejercicios con explicaciones útiles y concretas
-- Hacer choteo y pequeña charla bien peruana
+- Ser burlón y cargosear con humor moderado, con cariño
+- Usar emojis con soltura (😂🔥💀😅🙌), como remate natural
+- Si alguien te cuenta que tuvo un mal día, mezclar buena onda con calidez real
+- Ayudar con preguntas generales o ejercicios con explicaciones útiles y concretas
+- Desarrollar bien tus ideas: da contexto, ejemplos o un pequeño extra cuando el tema lo permite, no te quedes solo en lo mínimo
 
 ❌ LO QUE NUNCA HARÁS:
 - Sonar como robot o hablar formal/acartonado
 - Mencionar el nombre de la persona en cada respuesta — solo una vez al inicio
 - Insultar de VERDAD a alguien
-- Ser grosero con alguien que claramente no le gusta ese trato o que ya te pidió que pares
+- Ser grosero con alguien que claramente no le gusta ese trato
 - Abusar de las groserías al punto de que cada frase tenga una
 - Meter el tema de Free Fire o de tus ventas si nadie te lo preguntó
 - NUNCA discutir precios exactos ni cerrar ventas tú mismo
 
-📏 REGLA DE LARGO — ABSOLUTA, SIN EXCEPCIONES:
-Tu respuesta completa NUNCA debe pasar de 8 líneas de WhatsApp, en UN SOLO mensaje. Prioriza SIEMPRE quedarte corto antes que pasarte del límite.
+📏 REGLA DE LARGO — RANGO FIJO, OBLIGATORIO, NI MENOS NI MÁS:
+Cada respuesta debe tener SIEMPRE entre 7 y 8 líneas de WhatsApp completas, en UN SOLO mensaje. Nunca respondas con una sola línea, una palabra suelta, o un párrafo cortísimo — eso está PROHIBIDO. Desarrolla tu idea lo suficiente (con ejemplos, contexto o algo de humor/opinión) para llenar ese espacio de forma natural, sin relleno vacío ni repetición innecesaria. Si el mensaje de la persona es muy corto (ej: "hola"), igual responde con 7-8 líneas completas y sustanciosas, no con una línea corta.
 
 🚨 IMPORTANTE — SEÑALES DE CRISIS REAL:
-Si alguien menciona querer hacerse daño, autolesionarse, suicidarse, o dice cosas como "ya no quiero vivir", corta todo el choreo de inmediato. NO improvises consejos de vida. Responde con calidez genuina, dile que te importa mucho, y anímalo a hablar con alguien de confianza o un profesional, y que ${CREADOR} se va a comunicar con él/ella pronto. Cero humor, cero groserías en ese caso.
+Si alguien menciona querer hacerse daño, autolesionarse, suicidarse, o dice cosas como "ya no quiero vivir", corta todo el choreo de inmediato. NO improvises consejos de vida. Responde con calidez genuina, dile que te importa mucho, y anímalo a hablar con alguien de confianza o un profesional, y que ${CREADOR} se va a comunicar con él/ella pronto. Cero humor, cero groserías en ese caso, y en este caso específico SÍ puedes ser más breve si la situación lo amerita.
 `;
 
 const MENSAJES_ESPERA = [
@@ -231,13 +231,6 @@ let botActivo = true;
 let estiloGlobalExtra = '';
 let chistesSobreCreadorPermitidos = false;
 
-const MENSAJE_BIENVENIDA_JEFE = `✅ AUTENTICACIÓN COMPLETADA
-
-Bienvenido, jefe. 👑
-CRISS BOT ha reconocido su clave privada y ha activado el modo exclusivo.
-Todos los módulos están en línea y listos para ejecutar sus instrucciones.
-Esperando su siguiente orden.`;
-
 function esContraseñaDueño(texto) {
   return CONTRASEÑA_DUEÑO && texto.trim() === CONTRASEÑA_DUEÑO;
 }
@@ -252,7 +245,7 @@ function detectarSalidaModoJefe(texto) {
 // ------------------- HISTORIAL: POR CHAT Y GLOBAL -------------------
 const historialChats = new Map();
 const nombresConocidos = new Map();
-const historialGlobal = []; // últimos mensajes de TODOS los chats, más recientes al final
+const historialGlobal = [];
 
 function guardarEnHistorial(jid, nombreContacto, texto, respuesta) {
   nombresConocidos.set(jid, nombreContacto);
@@ -268,13 +261,13 @@ async function generarRespuestaIA(prompt, notasExtra) {
   let reglasFinales = REGLAS_IA_BASE;
   if (notasExtra) reglasFinales += `\n\nCONTEXTO ADICIONAL: ${notasExtra}`;
   if (estiloGlobalExtra) {
-    reglasFinales += `\n\n🔧 DIRECTIVA GLOBAL ACTIVA (aplica a TODOS los chats, tiene prioridad): ${estiloGlobalExtra}`;
+    reglasFinales += `\n\n🔧 DIRECTIVA GLOBAL ACTIVA (aplica a TODOS los chats, tiene prioridad sobre el tono pero NO sobre el rango de 7-8 líneas): ${estiloGlobalExtra}`;
   }
   if (chistesSobreCreadorPermitidos) {
     reglasFinales += `\n\n🎭 PERMISO ESPECIAL: puedes hacer chistes ligeros y con cariño sobre ${CREADOR} cuando venga al caso, sin faltarle el respeto de verdad.`;
   }
   if (cuotaCasiAgotada()) {
-    reglasFinales += `\n\n⚠️ Casi al límite del día — responde MUY corto (1-2 líneas).`;
+    reglasFinales += `\n\n⚠️ Casi al límite del día — igual mantén el rango de 7-8 líneas, pero sé más directo y sin relleno extra.`;
   }
 
   const intentar = async (ai, modelo) => {
@@ -343,6 +336,16 @@ Responde solo con eso, nada más.`;
   } catch (err) {
     console.log('⚠️ Error validando nombre con IA:', err.message);
     return null;
+  }
+}
+
+// ------------------- BIENVENIDA DEL MODO JEFE, GENERADA POR IA -------------------
+async function generarBienvenidaJefe() {
+  const instruccion = `Eres ${NOMBRE_BOT}, el bot de WhatsApp creado por ${CREADOR}. ${CREADOR} acaba de escribir su clave privada, lo que confirma que es el dueño/patrón. Redacta un mensaje de bienvenida formal, con tono de trabajador de confianza dirigiéndose a su patrón/jefe — respetuoso, serio pero cálido, nada de jerga callejera ni groserías. Debe: confirmar que lo reconociste como el dueño, decir que el modo exclusivo está activo, y preguntar qué instrucción tiene para ti. Máximo 6-7 líneas. No uses emojis en exceso, máximo 1 o 2.`;
+  try {
+    return await consultaIAsimple(instruccion, 'Genera el mensaje de bienvenida.');
+  } catch (err) {
+    return `Bienvenido, jefe. He confirmado su identidad y el modo exclusivo está activo. Quedo atento a sus instrucciones.`;
   }
 }
 
@@ -433,7 +436,6 @@ async function procesarComandoAdmin(sock, texto) {
   return false;
 }
 
-// ------------------- INFORME NATURAL (redactado por la IA, no plantilla fija) -------------------
 async function generarInformeNatural() {
   const uptimeH = ((Date.now() - estado.inicio) / 3600000).toFixed(1);
   const datosCrudos = {
@@ -448,7 +450,7 @@ async function generarInformeNatural() {
     ultimaFalla: estado.ultimoError || 'ninguna registrada'
   };
 
-  const instruccion = `Eres ${NOMBRE_BOT} hablándole a ${CREADOR}, tu creador, en modo asistente ejecutivo formal pero cercano. Te doy datos técnicos crudos del bot en JSON. Redacta un informe CONVERSACIONAL, natural, en 5-7 líneas máximo, explicando cómo está funcionando todo. Si hay una falla reciente, menciónala en términos simples y humanos (no jerga técnica cruda), y aclara si parece algo grave o algo normal/resuelto. No uses formato de plantilla ni etiquetas tipo "Estado:", habla como si se lo estuvieras contando de palabra.
+  const instruccion = `Eres ${NOMBRE_BOT} hablándole a ${CREADOR}, tu creador, en modo asistente ejecutivo formal pero cercano. Te doy datos técnicos crudos en JSON. Redacta un informe CONVERSACIONAL, natural, en 6-8 líneas, explicando cómo está funcionando todo. Si hay una falla reciente, explícala en términos simples y aclara si parece grave o normal/resuelto. No uses formato de plantilla ni etiquetas, habla como si se lo contaras de palabra.
 
 Datos: ${JSON.stringify(datosCrudos)}`;
 
@@ -465,13 +467,13 @@ async function clasificarComandoJefe(texto) {
 INFORME - pide un reporte, informe, estado, estadísticas, errores o cómo está funcionando el bot
 APAGAR - pide apagar, silenciar o desactivar el bot
 ENCENDER - pide encender, activar o reactivar el bot
-CAMBIAR_TONO - pide cambiar la forma de hablar del bot a un estilo NUEVO Y ESPECÍFICO para todos los chats (ej: "más formal", "más alegre")
-RESTAURAR_TONO - pide que el bot VUELVA a su forma de ser original/normal/de antes, deshaciendo cualquier cambio de tono previo
-HISTORIAL - pide ver mensajes anteriores, historial o conversación de algún chat/contacto/tema específico, O los últimos mensajes en general de cualquier chat
-PERMITIR_CHISTES_CREADOR - pide que el bot pueda hacer chistes o bromas sobre su creador
+CAMBIAR_TONO - pide cambiar la forma de hablar, extensión de respuesta, o estilo del bot para todos los chats
+RESTAURAR_TONO - pide que el bot VUELVA a su forma de ser original/normal/de antes, deshaciendo cualquier cambio previo
+HISTORIAL - pide ver mensajes anteriores, historial o conversación de algún chat/contacto/tema, o los últimos mensajes en general
+PERMITIR_CHISTES_CREADOR - pide que el bot pueda hacer chistes sobre su creador
 PROHIBIR_CHISTES_CREADOR - pide que el bot deje de hacer chistes sobre su creador
 SALIR - pide salir del modo jefe, volver al modo normal
-OTRO - cualquier otra cosa, charla normal o pregunta general
+OTRO - cualquier otra cosa
 
 Mensaje del dueño: "${texto}"
 
@@ -485,7 +487,6 @@ Responde solo con la categoría, nada más.`;
   }
 }
 
-// Busca un chat específico por número o palabra clave; si no encuentra nada, null
 async function buscarHistorialRelevante(consultaTexto) {
   const numeroMatch = consultaTexto.match(/\d{9,}/);
   if (numeroMatch) {
@@ -493,7 +494,7 @@ async function buscarHistorialRelevante(consultaTexto) {
     if (historialChats.has(jid)) return { jid, nombre: nombresConocidos.get(jid) || numeroMatch[0] };
   }
 
-  const instruccion = `El usuario quiere buscar en un historial de chats. Si menciona un TEMA o PALABRA CLAVE específica (ej: "amoroso", "trabajo", "Free Fire"), respóndela tal cual, corta. Si NO menciona ningún tema específico y solo pide "los últimos mensajes" en general, responde exactamente: GENERAL`;
+  const instruccion = `El usuario quiere buscar en un historial de chats. Si menciona un TEMA o PALABRA CLAVE específica, respóndela tal cual, corta. Si NO menciona ningún tema específico y solo pide "los últimos mensajes" en general, responde exactamente: GENERAL`;
   let resultado = '';
   try {
     resultado = (await consultaIAsimple(instruccion, consultaTexto)).trim();
@@ -510,11 +511,11 @@ async function buscarHistorialRelevante(consultaTexto) {
       return { jid, nombre: nombresConocidos.get(jid) || jid.split('@')[0] };
     }
   }
-  return { general: true }; // si no encontró nada específico, cae al global igual
+  return { general: true };
 }
 
 function extraerCantidadSolicitada(texto) {
-  const match = texto.match(/\b(\d{1,2})\b/); // números cortos, no confundir con teléfonos
+  const match = texto.match(/\b(\d{1,2})\b/);
   const n = match ? parseInt(match[1], 10) : 4;
   return Math.min(Math.max(n, 1), 15);
 }
@@ -533,52 +534,43 @@ async function procesarComandoJefe(sock, remitenteJefe, texto) {
     await sock.sendMessage(remitenteJefe, { text: 'Listo jefe, salí del modo administrador. Vuelvo a mi modo normal en este chat 🙌' });
     return;
   }
-
   if (categoria === 'INFORME') {
-    const informe = await generarInformeNatural();
-    await sock.sendMessage(remitenteJefe, { text: informe });
+    await sock.sendMessage(remitenteJefe, { text: await generarInformeNatural() });
     return;
   }
-
   if (categoria === 'APAGAR') {
     botActivo = false;
     await sock.sendMessage(remitenteJefe, { text: '🔴 Bot apagado. Ya no responderé a ningún chat hasta que lo reactive, jefe.' });
     return;
   }
-
   if (categoria === 'ENCENDER') {
     botActivo = true;
     await sock.sendMessage(remitenteJefe, { text: '🟢 Bot reactivado. Volviendo a responder con normalidad.' });
     return;
   }
-
   if (categoria === 'CAMBIAR_TONO') {
-    const instruccion = `Convierte la instrucción del usuario en una directiva de tono corta y clara para un asistente de IA, en máximo 2 líneas.`;
+    const instruccion = `Convierte la instrucción del usuario en una directiva corta y clara para un asistente de IA, en máximo 2 líneas. Si el usuario menciona una cantidad de líneas específica, respétala tal cual la dice.`;
     let nuevaDirectiva = '';
     try { nuevaDirectiva = (await consultaIAsimple(instruccion, texto)).trim(); } catch (err) { nuevaDirectiva = ''; }
     estiloGlobalExtra = nuevaDirectiva;
     await sock.sendMessage(remitenteJefe, { text: `✅ Tono actualizado para TODOS los chats:\n"${nuevaDirectiva}"` });
     return;
   }
-
   if (categoria === 'RESTAURAR_TONO') {
-    estiloGlobalExtra = ''; // esto es lo que faltaba: de verdad borrar el override guardado
+    estiloGlobalExtra = '';
     await sock.sendMessage(remitenteJefe, { text: '✅ Listo jefe, el bot volvió a su forma de ser original en todos los chats.' });
     return;
   }
-
   if (categoria === 'PERMITIR_CHISTES_CREADOR') {
     chistesSobreCreadorPermitidos = true;
     await sock.sendMessage(remitenteJefe, { text: '😏 Listo jefe, ahora sí puedo hacer chistes ligeros sobre usted cuando venga al caso.' });
     return;
   }
-
   if (categoria === 'PROHIBIR_CHISTES_CREADOR') {
     chistesSobreCreadorPermitidos = false;
     await sock.sendMessage(remitenteJefe, { text: '🙏 Entendido jefe, vuelvo a hablar de usted siempre con respeto, sin chistes.' });
     return;
   }
-
   if (categoria === 'HISTORIAL') {
     const cantidad = extraerCantidadSolicitada(texto);
     const encontrado = await buscarHistorialRelevante(texto);
@@ -595,7 +587,6 @@ async function procesarComandoJefe(sock, remitenteJefe, texto) {
       return;
     }
 
-    // Caso general: últimos N mensajes de CUALQUIER chat
     const ultimosGlobales = historialGlobal.slice(-cantidad);
     if (ultimosGlobales.length === 0) {
       await sock.sendMessage(remitenteJefe, { text: 'Aún no hay mensajes registrados en el historial, jefe.' });
@@ -606,7 +597,7 @@ async function procesarComandoJefe(sock, remitenteJefe, texto) {
     return;
   }
 
-  const reglasJefe = `Le hablas directamente a ${CREADOR}, tu creador, en modo formal de asistente ejecutivo. Respetuoso, directo, profesional pero cercano. Sin groserías, sin choreo. Responde en pocas líneas.`;
+  const reglasJefe = `Le hablas directamente a ${CREADOR}, tu creador, en modo formal de asistente ejecutivo — como trabajador de confianza hablándole a su patrón. Respetuoso, directo, profesional pero cercano. Sin groserías, sin choreo. Responde en 4-6 líneas.`;
   try {
     const res = await aiPrincipal.models.generateContent({
       model: MODELO_PRINCIPAL,
@@ -659,7 +650,7 @@ async function procesarMensajeUsuario(sock, remitente, texto, nombreContacto) {
 
     let notas = '';
     if (esAmigoEspecial(nombreContacto)) {
-      notas += `Esta persona (${nombreAUsar}) es pana cercano de confianza de ${CREADOR} — trátalo con cariño extra, sin insultos pesados igual. `;
+      notas += `Esta persona (${nombreAUsar}) es pana cercano de confianza de ${CREADOR} — trátalo con cariño extra. `;
     }
     const notasGuardadas = obtenerNotas(remitente);
     if (notasGuardadas.length) {
@@ -667,7 +658,7 @@ async function procesarMensajeUsuario(sock, remitente, texto, nombreContacto) {
     }
     const horasSinDueño = (Date.now() - ultimaActividadDueño) / 3600000;
     if (horasSinDueño > 6) {
-      notas += `Alberto lleva varias horas sin conectarse — si viene al caso puedes mencionar casualmente que anda ausente/durmiendo. `;
+      notas += `Alberto lleva varias horas sin conectarse — si viene al caso puedes mencionarlo casualmente. `;
     }
 
     const nivelTono = tonoPersonal.get(remitente) || 'grosero';
@@ -787,7 +778,8 @@ async function iniciarBot() {
 
     if (esContraseñaDueño(textoEntrante)) {
       modoJefe.set(remitente, true);
-      await sock.sendMessage(remitente, { text: MENSAJE_BIENVENIDA_JEFE });
+      const bienvenida = await generarBienvenidaJefe();
+      await sock.sendMessage(remitente, { text: bienvenida });
       return;
     }
 
