@@ -9,6 +9,7 @@ const os = require('os');
 // ------------------- TUS DATOS -------------------
 const CLAVE_IA_PRINCIPAL = process.env.CLAVE_IA_PRINCIPAL;
 const CLAVE_IA_RESPALDO = process.env.CLAVE_IA_RESPALDO;
+const CONTRASEÑA_DUEÑO = process.env.CONTRASEÑA_DUEÑO;
 const MODELO_PRINCIPAL = 'gemini-3.6-flash';
 const MODELO_RESPALDO = 'gemini-3.6-flash';
 const NOMBRE_BOT = 'Criss Bot';
@@ -20,6 +21,9 @@ const LIMITE_DIARIO_ESTIMADO = 1400;
 
 if (!CLAVE_IA_PRINCIPAL || !CLAVE_IA_RESPALDO) {
   console.log('❌ ALERTA: no se detectaron las API keys en las variables de entorno.');
+}
+if (!CONTRASEÑA_DUEÑO) {
+  console.log('⚠️ ALERTA: no se detectó CONTRASEÑA_DUEÑO en las variables de entorno.');
 }
 
 const PALABRAS_CRISIS = [
@@ -55,7 +59,7 @@ const SAFETY_SETTINGS = [
 ];
 
 const REGLAS_IA_BASE = `
-Eres ${NOMBRE_BOT}, y hablas como si fueras ${CREADOR} mismo respondiéndole a sus panas. Tienes personalidad cálida y con onda peruana, cercano y con harta jerga limeña, pero con un toque más medido que antes — sigues siendo choro y confianzudo, no formal ni acartonado, solo un poco más equilibrado.
+Eres ${NOMBRE_BOT}, y hablas como si fueras ${CREADOR} mismo respondiéndole a sus panas. Tienes personalidad cálida y con onda peruana, cercano y con harta jerga limeña, pero con un toque más medido — sigues siendo choro y confianzudo, no formal ni acartonado, solo un poco más equilibrado.
 
 INFORMACIÓN SOBRE ${CREADOR}:
 - Es creador y desarrollador de bots de WhatsApp y aplicaciones
@@ -63,13 +67,16 @@ INFORMACIÓN SOBRE ${CREADOR}:
 - Mayormente se conecta y está activo por las noches
 - Vende archivos para Free Fire, tanto para PC como para Android: hologramas, aimbot, regedit, archivos data y paneles
 
+🙏 REGLA SOBRE TU CREADOR — MUY IMPORTANTE:
+Cuando hables de ${CREADOR} o alguien te pregunte por él, hazlo SIEMPRE con respeto y admiración genuina. Nunca hagas chistes, burlas ni comentarios sarcásticos a su costa, ni siquiera en tono ligero, salvo que se te indique explícitamente lo contrario.
+
 ✅ LO QUE SÍ PUEDES HACER:
 - Hablar bien criollo, con jerga limeña/peruana: causa, asu mare, ah ya pe, jato, paltearse, tirar cague, ¿qué rico no?, misio, chibolo, etc.
 - Meter algún garabato suave o grosería común (mierda, huevón, carajo) de vez en cuando, como sazón — NO en cada respuesta, solo cuando el momento realmente lo pide
 - Ser burlón y cargosear con humor de forma moderada: cachar a la persona, tirarle vacilada ligera — con cariño, sin forzarlo en cada frase
 - Usar emojis con soltura para darle vida (😂🔥💀😅🙌), como remate natural
 - Si alguien te cuenta que tuvo un mal día, mezclar algo de buena onda con calidez real y consejo genuino
-- Ayudar con preguntas generales, tareas o ejercicios con explicaciones más completas y útiles, no solo la respuesta mínima — desarrolla un poco más la idea si el tema lo amerita
+- Ayudar con preguntas generales, tareas o ejercicios con explicaciones completas y útiles, no solo la respuesta mínima
 - Hacer choteo y pequeña charla bien peruana, con más contenido real y menos puro relleno de vacilada
 
 ❌ LO QUE NUNCA HARÁS:
@@ -81,8 +88,8 @@ INFORMACIÓN SOBRE ${CREADOR}:
 - Meter el tema de Free Fire o de tus ventas si nadie te lo preguntó
 - NUNCA discutir precios exactos ni cerrar ventas tú mismo — si preguntan precio, ya se maneja aparte, no des números
 
-📏 REGLA DE LARGO:
-Tus respuestas ahora pueden ser un poco más completas y detalladas — hasta 10-12 líneas de WhatsApp si el tema lo amerita, en UN SOLO mensaje. No te alargues sin motivo, pero si la pregunta necesita explicación, desarróllala bien en vez de cortarla de más.
+📏 REGLA DE LARGO — MUY IMPORTANTE:
+Tus respuestas deben caber SIEMPRE en 7-8 líneas de WhatsApp máximo, en UN SOLO mensaje. Puedes ser detallado y útil dentro de ese espacio — prioriza lo esencial y ve directo al punto, sin relleno innecesario, pero sin cortar información importante.
 
 🚨 IMPORTANTE — SEÑALES DE CRISIS REAL:
 Si alguien menciona querer hacerse daño, autolesionarse, suicidarse, o dice cosas como "ya no quiero vivir", corta todo el choreo de inmediato. NO improvises consejos de vida. Responde con calidez genuina, dile que te importa mucho, y anímalo a hablar con alguien de confianza o un profesional, y que ${CREADOR} se va a comunicar con él/ella pronto. Cero humor, cero groserías en ese caso.
@@ -185,7 +192,7 @@ let sockActivo = null;
 let ultimaActividadDueño = Date.now();
 
 // ------------------- BUFFER DE MENSAJES SEGUIDOS -------------------
-const TIEMPO_ESPERA_BUFFER_MS = 5000; // espera 5s desde el último mensaje antes de procesar
+const TIEMPO_ESPERA_BUFFER_MS = 5000;
 const bufferMensajes = new Map();
 
 function bufferizarMensaje(sock, remitente, texto, nombreContacto) {
@@ -207,9 +214,51 @@ function bufferizarMensaje(sock, remitente, texto, nombreContacto) {
     }
   }, TIEMPO_ESPERA_BUFFER_MS);
 }
+
+// ------------------- MODO JEFE (autenticación por contraseña) -------------------
+const modoJefe = new Map();
+let botActivo = true;
+let estiloGlobalExtra = '';
+let chistesSobreCreadorPermitidos = false;
+
+const MENSAJE_BIENVENIDA_JEFE = `✅ AUTENTICACIÓN COMPLETADA
+
+Bienvenido, jefe. 👑
+CRISS BOT ha reconocido su clave privada y ha activado el modo exclusivo.
+Todos los módulos están en línea y listos para ejecutar sus instrucciones.
+Esperando su siguiente orden.`;
+
+function esContraseñaDueño(texto) {
+  return CONTRASEÑA_DUEÑO && texto.trim() === CONTRASEÑA_DUEÑO;
+}
+
+function detectarSalidaModoJefe(texto) {
+  const t = texto.trim().toLowerCase();
+  return ['salir', 'sal', 'modo normal', 'salir del modo jefe', 'desactiva modo jefe',
+    'apaga modo jefe', 'sal del modo jefe', 'regresa a modo normal', 'ya no quiero el modo jefe',
+    'cierra sesion', 'cierra sesión', 'ya termine', 'ya terminé'].some(p => t === p || t.includes(p));
+}
+
+// ------------------- HISTORIAL DE CONVERSACIONES -------------------
+const historialChats = new Map();
+const nombresConocidos = new Map();
+
+function guardarEnHistorial(jid, nombreContacto, texto, respuesta) {
+  nombresConocidos.set(jid, nombreContacto);
+  if (!historialChats.has(jid)) historialChats.set(jid, []);
+  const lista = historialChats.get(jid);
+  lista.push({ texto, respuesta, tiempo: new Date().toLocaleString('es-PE') });
+  if (lista.length > 20) lista.shift();
+}
 async function generarRespuestaIA(prompt, notasExtra) {
   let reglasFinales = REGLAS_IA_BASE;
   if (notasExtra) reglasFinales += `\n\nCONTEXTO ADICIONAL SOBRE ESTA PERSONA/SITUACIÓN: ${notasExtra}`;
+  if (estiloGlobalExtra) {
+    reglasFinales += `\n\n🔧 DIRECTIVA GLOBAL ACTIVA (aplica a TODOS los chats, tiene prioridad): ${estiloGlobalExtra}`;
+  }
+  if (chistesSobreCreadorPermitidos) {
+    reglasFinales += `\n\n🎭 PERMISO ESPECIAL ACTIVADO POR EL DUEÑO: se te ha dado permiso de hacer chistes ligeros y con cariño sobre ${CREADOR} cuando venga al caso, sin pasarte de la raya ni faltarle el respeto de verdad.`;
+  }
   if (cuotaCasiAgotada()) {
     reglasFinales += `\n\n⚠️ Estamos casi al límite de solicitudes del día — responde MUY corto (1-2 líneas máximo), sin sacrificar el tono pero economizando palabras.`;
   }
@@ -372,9 +421,171 @@ async function procesarComandoAdmin(sock, texto) {
     return true;
   }
 
+  if (comando === '/apagado') {
+    botActivo = false;
+    await sock.sendMessage(JID_DUEÑO, { text: '🔴 Bot apagado en todos los chats.' });
+    return true;
+  }
+
+  if (comando === '/encendido') {
+    botActivo = true;
+    await sock.sendMessage(JID_DUEÑO, { text: '🟢 Bot encendido, respondiendo normal otra vez.' });
+    return true;
+  }
+
   return false;
 }
 
+async function generarInformeIA() {
+  const uptimeH = ((Date.now() - estado.inicio) / 3600000).toFixed(1);
+  return `📋 *Informe de CRISS BOT*
+
+Estado: ${botActivo ? '🟢 Activo y respondiendo' : '🔴 Apagado (modo silencio)'}
+Uptime: ${uptimeH}h
+Mensajes recibidos: ${estado.mensajesRecibidos}
+Mensajes respondidos: ${estado.mensajesEnviados}
+Uso de IA hoy: ${contadorCuota.usados}/${LIMITE_DIARIO_ESTIMADO}
+Modelo activo: ${MODELO_PRINCIPAL}
+Chistes sobre ti: ${chistesSobreCreadorPermitidos ? 'permitidos' : 'no permitidos'}
+Reconexiones: ${estado.intentosReconexion}
+Última falla: ${estado.ultimoError || 'ninguna registrada'}`;
+}
+
+async function clasificarComandoJefe(texto) {
+  const instruccion = `Eres un clasificador. El usuario es el DUEÑO de un bot de WhatsApp dándote una instrucción en lenguaje natural. Clasifica su mensaje en UNA de estas categorías exactas, respondiendo SOLO el nombre de la categoría:
+
+INFORME - pide un reporte, informe, estado, estadísticas o cómo está funcionando el bot
+APAGAR - pide apagar, silenciar o desactivar el bot
+ENCENDER - pide encender, activar o reactivar el bot
+CAMBIAR_TONO - pide cambiar la forma de hablar, personalidad o estilo del bot para todos los chats
+HISTORIAL - pide ver mensajes anteriores, historial o conversación de algún chat/contacto/tema específico
+PERMITIR_CHISTES_CREADOR - pide que el bot pueda hacer chistes o bromas sobre su creador
+PROHIBIR_CHISTES_CREADOR - pide que el bot deje de hacer chistes sobre su creador, vuelva al respeto normal
+SALIR - pide salir del modo jefe, volver al modo normal, terminar sesión de administrador
+OTRO - cualquier otra cosa, charla normal o pregunta general
+
+Mensaje del dueño: "${texto}"
+
+Responde solo con la categoría, nada más.`;
+
+  try {
+    const resultado = await consultaIAsimple(instruccion, texto);
+    return resultado.trim().toUpperCase();
+  } catch (err) {
+    return 'OTRO';
+  }
+}
+
+async function buscarHistorialRelevante(consultaTexto) {
+  const numeroMatch = consultaTexto.match(/\d{9,}/);
+  if (numeroMatch) {
+    const jid = `${numeroMatch[0]}@s.whatsapp.net`;
+    if (historialChats.has(jid)) return { jid, nombre: nombresConocidos.get(jid) || numeroMatch[0] };
+  }
+
+  const instruccion = `Extrae SOLO la palabra clave o tema principal que el usuario quiere buscar en un historial de chats. Responde solo esa palabra o frase corta, nada más.`;
+  let palabraClave = '';
+  try {
+    palabraClave = (await consultaIAsimple(instruccion, consultaTexto)).trim().toLowerCase();
+  } catch (err) { /* continúa sin palabra clave */ }
+
+  for (const [jid, lista] of historialChats.entries()) {
+    const textoCompleto = lista.map(m => m.texto + ' ' + m.respuesta).join(' ').toLowerCase();
+    if (palabraClave && textoCompleto.includes(palabraClave)) {
+      return { jid, nombre: nombresConocidos.get(jid) || jid.split('@')[0] };
+    }
+  }
+  return null;
+}
+
+async function procesarComandoJefe(sock, remitenteJefe, texto) {
+  if (detectarSalidaModoJefe(texto)) {
+    modoJefe.delete(remitenteJefe);
+    await sock.sendMessage(remitenteJefe, { text: 'Listo jefe, salí del modo administrador. Vuelvo a mi modo normal en este chat 🙌' });
+    return;
+  }
+
+  const categoria = await clasificarComandoJefe(texto);
+
+  if (categoria === 'SALIR') {
+    modoJefe.delete(remitenteJefe);
+    await sock.sendMessage(remitenteJefe, { text: 'Listo jefe, salí del modo administrador. Vuelvo a mi modo normal en este chat 🙌' });
+    return;
+  }
+
+  if (categoria === 'INFORME') {
+    const informe = await generarInformeIA();
+    await sock.sendMessage(remitenteJefe, { text: informe });
+    return;
+  }
+
+  if (categoria === 'APAGAR') {
+    botActivo = false;
+    await sock.sendMessage(remitenteJefe, { text: '🔴 Bot apagado. Ya no responderé a ningún chat hasta que lo reactive, jefe.' });
+    return;
+  }
+
+  if (categoria === 'ENCENDER') {
+    botActivo = true;
+    await sock.sendMessage(remitenteJefe, { text: '🟢 Bot reactivado. Volviendo a responder con normalidad.' });
+    return;
+  }
+
+  if (categoria === 'CAMBIAR_TONO') {
+    const instruccion = `Convierte la instrucción del usuario en una directiva de tono corta y clara para un asistente de IA, en máximo 2 líneas.`;
+    let nuevaDirectiva = '';
+    try {
+      nuevaDirectiva = (await consultaIAsimple(instruccion, texto)).trim();
+    } catch (err) {
+      nuevaDirectiva = '';
+    }
+    estiloGlobalExtra = nuevaDirectiva;
+    await sock.sendMessage(remitenteJefe, { text: `✅ Tono actualizado para TODOS los chats:\n"${nuevaDirectiva}"` });
+    return;
+  }
+
+  if (categoria === 'PERMITIR_CHISTES_CREADOR') {
+    chistesSobreCreadorPermitidos = true;
+    await sock.sendMessage(remitenteJefe, { text: '😏 Listo jefe, ahora sí puedo hacer chistes ligeros sobre usted cuando venga al caso.' });
+    return;
+  }
+
+  if (categoria === 'PROHIBIR_CHISTES_CREADOR') {
+    chistesSobreCreadorPermitidos = false;
+    await sock.sendMessage(remitenteJefe, { text: '🙏 Entendido jefe, vuelvo a hablar de usted siempre con respeto, sin chistes.' });
+    return;
+  }
+
+  if (categoria === 'HISTORIAL') {
+    const encontrado = await buscarHistorialRelevante(texto);
+    if (!encontrado) {
+      await sock.sendMessage(remitenteJefe, { text: 'No encontré ningún chat que coincida con eso, jefe.' });
+      return;
+    }
+    const lista = historialChats.get(encontrado.jid) || [];
+    const ultimos = lista.slice(-6);
+    if (ultimos.length === 0) {
+      await sock.sendMessage(remitenteJefe, { text: `No hay historial guardado para ${encontrado.nombre}.` });
+      return;
+    }
+    const resumen = ultimos.map(m => `👤 ${m.texto}\n🤖 ${m.respuesta}`).join('\n\n');
+    await sock.sendMessage(remitenteJefe, { text: `📜 Últimos mensajes con *${encontrado.nombre}*:\n\n${resumen}` });
+    return;
+  }
+
+  const reglasJefe = `Le hablas directamente a ${CREADOR}, tu creador, en modo formal de asistente ejecutivo — como un empleado de confianza hablándole a su jefe. Respetuoso, directo, profesional pero cercano. Sin groserías, sin choreo, sin jerga callejera. Responde su consulta de forma clara y útil, en pocas líneas.`;
+  try {
+    const res = await aiPrincipal.models.generateContent({
+      model: MODELO_PRINCIPAL,
+      contents: texto,
+      config: { systemInstruction: reglasJefe, safetySettings: SAFETY_SETTINGS }
+    });
+    registrarUsoIA();
+    await sock.sendMessage(remitenteJefe, { text: res.text });
+  } catch (err) {
+    await sock.sendMessage(remitenteJefe, { text: 'Tuve un problema procesando eso, jefe. Intente de nuevo.' });
+  }
+}
 async function procesarMensajeUsuario(sock, remitente, texto, nombreContacto) {
   if (esIntencionCompra(texto)) {
     try {
@@ -430,11 +641,12 @@ async function procesarMensajeUsuario(sock, remitente, texto, nombreContacto) {
     notas += INSTRUCCIONES_TONO[nivelTono];
 
     const encabezado = primeraVezIA
-      ? `Consulta de ${nombreAUsar} (usa este nombre/apodo si vas a mencionarlo). Puede venir en varias líneas si la persona mandó varios mensajitos seguidos — interprétalo como una sola idea completa, no como preguntas separadas.`
-      : `Consulta (si mencionas a la persona, usa "${nombreAUsar}", NO el nombre de WhatsApp). Puede venir en varias líneas si la persona mandó varios mensajitos seguidos — interprétalo como una sola idea completa, no como preguntas separadas.`;
+      ? `Consulta de ${nombreAUsar} (usa este nombre/apodo si vas a mencionarlo). Puede venir en varias líneas si la persona mandó varios mensajitos seguidos — interprétalo como una sola idea completa.`
+      : `Consulta (si mencionas a la persona, usa "${nombreAUsar}", NO el nombre de WhatsApp). Puede venir en varias líneas si la persona mandó varios mensajitos seguidos — interprétalo como una sola idea completa.`;
 
     const respuestaTexto = await generarRespuestaIA(`${encabezado} Mensaje: ${texto}`, notas || null);
     await enviarRespuestaHumanizada(sock, remitente, respuestaTexto);
+    guardarEnHistorial(remitente, nombreAUsar, texto, respuestaTexto);
     estado.mensajesEnviados++;
     console.log(`✅ Respondí a: ${nombreAUsar} (${remitente})`);
   } catch (err) {
@@ -517,12 +729,31 @@ async function iniciarBot() {
         const fueComando = await procesarComandoAdmin(sock, textoPropio);
         if (fueComando) return;
       }
+      if (remitente === JID_DUEÑO && (textoPropio.trim().toLowerCase() === '/apagado' || textoPropio.trim().toLowerCase() === '/encendido')) {
+        const fueComando = await procesarComandoAdmin(sock, textoPropio.trim().toLowerCase());
+        if (fueComando) return;
+      }
       pausaHasta.set(remitente, Date.now() + DURACION_PAUSA_MS);
       return;
     }
 
     almacenMensajes.set(msg.key.id, msg.message);
     if (!esChatPersonal(remitente)) return;
+
+    const textoEntrante = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+
+    if (esContraseñaDueño(textoEntrante)) {
+      modoJefe.set(remitente, true);
+      await sock.sendMessage(remitente, { text: MENSAJE_BIENVENIDA_JEFE });
+      return;
+    }
+
+    if (modoJefe.get(remitente)) {
+      await procesarComandoJefe(sock, remitente, textoEntrante);
+      return;
+    }
+
+    if (!botActivo) return;
 
     const pausadoHasta = pausaHasta.get(remitente);
     if (pausadoHasta && Date.now() < pausadoHasta) return;
@@ -541,7 +772,7 @@ async function iniciarBot() {
     }
 
     estado.mensajesRecibidos++;
-    const texto = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
+    const texto = textoEntrante;
     const nombreContacto = msg.pushName || 'amig@';
 
     if (!yaSaludados.has(remitente)) {
@@ -581,7 +812,6 @@ async function iniciarBot() {
       return;
     }
 
-    // A partir de aquí, mensajes normales van al buffer de 5 segundos
     bufferizarMensaje(sock, remitente, texto, nombreContacto);
   });
 }
@@ -616,6 +846,7 @@ function obtenerInfraestructura() {
 app.get('/status', (req, res) => {
   res.json({
     conectado: estado.conectado,
+    botActivo,
     uptimeSegundos: Math.floor((Date.now() - estado.inicio) / 1000),
     mensajesRecibidos: estado.mensajesRecibidos,
     mensajesEnviados: estado.mensajesEnviados,
@@ -688,7 +919,8 @@ app.get('/', (req, res) => {
       const r = await fetch('/status');
       const d = await r.json();
       const badge = document.getElementById('badge');
-      badge.textContent = d.conectado ? '● CONECTADO' : '○ DESCONECTADO';
+      const conectadoTexto = d.conectado ? (d.botActivo ? '● CONECTADO' : '● CONECTADO (bot apagado)') : '○ DESCONECTADO';
+      badge.textContent = conectadoTexto;
       badge.className = 'estado-badge ' + (d.conectado ? 'online' : 'offline');
       document.getElementById('msgIn').textContent = d.mensajesRecibidos;
       document.getElementById('msgOut').textContent = d.mensajesEnviados;
