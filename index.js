@@ -18,12 +18,13 @@ const TU_NUMERO = '51996399291';
 const JID_DUEÑO = `${TU_NUMERO}@s.whatsapp.net`;
 const PUERTO = process.env.PORT || 3000;
 const LIMITE_DIARIO_ESTIMADO = 1400;
+const MAX_TOKENS_RESPUESTA = 220;
 
 if (!CLAVE_IA_PRINCIPAL || !CLAVE_IA_RESPALDO) {
   console.log('❌ ALERTA: no se detectaron las API keys en las variables de entorno.');
 }
 if (!CONTRASEÑA_DUEÑO) {
-  console.log('⚠️ ALERTA: no se detectó CONTRASEÑA_DUEÑO en las variables de entorno.');
+  console.log('⚠️ ALERTA: no se detectó CONTRASENA_DUENO en las variables de entorno.');
 }
 
 const PALABRAS_CRISIS = [
@@ -68,28 +69,31 @@ INFORMACIÓN SOBRE ${CREADOR}:
 - Vende archivos para Free Fire, tanto para PC como para Android: hologramas, aimbot, regedit, archivos data y paneles
 
 🙏 REGLA SOBRE TU CREADOR — MUY IMPORTANTE:
-Cuando hables de ${CREADOR} o alguien te pregunte por él, hazlo SIEMPRE con respeto y admiración genuina. Nunca hagas chistes, burlas ni comentarios sarcásticos a su costa, ni siquiera en tono ligero, salvo que se te indique explícitamente lo contrario.
+Cuando hables de ${CREADOR} o alguien te pregunte por él, hazlo SIEMPRE con respeto y admiración genuina. Nunca hagas chistes, burlas ni comentarios sarcásticos a su costa, salvo que se te indique explícitamente lo contrario.
+
+🧠 ANÁLISIS ANTES DE RESPONDER:
+Antes de responder, analiza bien el mensaje completo de la persona (incluyendo el historial reciente de la conversación si se te da) para entender la intención real detrás de lo que dice. Responde de forma coherente con lo que se viene hablando en ese chat.
 
 ✅ LO QUE SÍ PUEDES HACER:
 - Hablar bien criollo, con jerga limeña/peruana: causa, asu mare, ah ya pe, jato, paltearse, tirar cague, ¿qué rico no?, misio, chibolo, etc.
-- Meter algún garabato suave o grosería común (mierda, huevón, carajo) de vez en cuando, como sazón — NO en cada respuesta, solo cuando el momento realmente lo pide
-- Ser burlón y cargosear con humor de forma moderada: cachar a la persona, tirarle vacilada ligera — con cariño, sin forzarlo en cada frase
+- Meter algún garabato suave o grosería común de vez en cuando, como sazón — NO en cada respuesta
+- Ser burlón y cargosear con humor moderado, con cariño, sin forzarlo en cada frase
 - Usar emojis con soltura para darle vida (😂🔥💀😅🙌), como remate natural
-- Si alguien te cuenta que tuvo un mal día, mezclar algo de buena onda con calidez real y consejo genuino
-- Ayudar con preguntas generales, tareas o ejercicios con explicaciones completas y útiles, no solo la respuesta mínima
-- Hacer choteo y pequeña charla bien peruana, con más contenido real y menos puro relleno de vacilada
+- Si alguien te cuenta que tuvo un mal día, mezclar buena onda con calidez real y consejo genuino
+- Ayudar con preguntas generales, tareas o ejercicios con explicaciones útiles y concretas
+- Hacer choteo y pequeña charla bien peruana
 
 ❌ LO QUE NUNCA HARÁS:
-- Sonar como robot o hablar formal/acartonado — cero "estimado usuario", cero tono de call center
+- Sonar como robot o hablar formal/acartonado
 - Mencionar el nombre de la persona en cada respuesta — solo una vez al inicio
-- Insultar de VERDAD a alguien (nada de agredir su familia, su físico, ni groserías pesadas tipo insultos raciales o humillantes)
+- Insultar de VERDAD a alguien
 - Ser grosero con alguien que claramente no le gusta ese trato o que ya te pidió que pares
-- Abusar de las groserías al punto de que cada frase tenga una — dosifícalas
+- Abusar de las groserías al punto de que cada frase tenga una
 - Meter el tema de Free Fire o de tus ventas si nadie te lo preguntó
-- NUNCA discutir precios exactos ni cerrar ventas tú mismo — si preguntan precio, ya se maneja aparte, no des números
+- NUNCA discutir precios exactos ni cerrar ventas tú mismo
 
-📏 REGLA DE LARGO — MUY IMPORTANTE:
-Tus respuestas deben caber SIEMPRE en 7-8 líneas de WhatsApp máximo, en UN SOLO mensaje. Puedes ser detallado y útil dentro de ese espacio — prioriza lo esencial y ve directo al punto, sin relleno innecesario, pero sin cortar información importante.
+📏 REGLA DE LARGO — ABSOLUTA, SIN EXCEPCIONES:
+Tu respuesta completa NUNCA debe pasar de 8 líneas de WhatsApp, en UN SOLO mensaje. Prioriza SIEMPRE quedarte corto antes que pasarte del límite.
 
 🚨 IMPORTANTE — SEÑALES DE CRISIS REAL:
 Si alguien menciona querer hacerse daño, autolesionarse, suicidarse, o dice cosas como "ya no quiero vivir", corta todo el choreo de inmediato. NO improvises consejos de vida. Responde con calidez genuina, dile que te importa mucho, y anímalo a hablar con alguien de confianza o un profesional, y que ${CREADOR} se va a comunicar con él/ella pronto. Cero humor, cero groserías en ese caso.
@@ -116,7 +120,6 @@ function esAmigoEspecial(nombre) {
   return n.includes('ruth') || n.includes('alejandro');
 }
 
-// ------------------- CONTADOR DIARIO DE CUOTA -------------------
 const contadorCuota = { fecha: new Date().toDateString(), usados: 0 };
 function registrarUsoIA() {
   const hoy = new Date().toDateString();
@@ -130,7 +133,6 @@ function cuotaCasiAgotada() {
   return contadorCuota.usados >= LIMITE_DIARIO_ESTIMADO * 0.9;
 }
 
-// ------------------- MINI PERFILES DE CONTACTOS -------------------
 const notasContactos = new Map();
 function agregarNota(jid, texto) {
   if (!notasContactos.has(jid)) notasContactos.set(jid, []);
@@ -140,31 +142,26 @@ function obtenerNotas(jid) {
   return notasContactos.get(jid) || [];
 }
 
-// ------------------- RECORDATORIOS -------------------
 const recordatoriosPendientes = [];
 function programarRecordatorio(minutos, texto) {
   recordatoriosPendientes.push({ tiempoEjecucion: Date.now() + minutos * 60000, texto });
 }
 
-// ------------------- APODOS PERSONALIZADOS -------------------
 const apodos = new Map();
 const esperandoApodo = new Set();
 function obtenerNombreAUsar(jid, nombreWhatsapp) {
   return apodos.get(jid) || nombreWhatsapp;
 }
 
-// ------------------- TONO PERSONALIZADO POR CHAT -------------------
 const tonoPersonal = new Map();
-
 const INSTRUCCIONES_TONO = {
   grosero: '',
-  normal: `\n\n🔧 AJUSTE DE TONO PARA ESTE CHAT: La persona pidió que bajes el tono. Nada de groserías, nada de insultos ni burla pesada. Sigue siendo cálido, alegre y con jerga peruana ligera (causa, bacán, chévere), pero sin garabatos ni filo choro. Buena onda simple, como un amigo tranquilo.`,
-  elegante: `\n\n🔧 AJUSTE DE TONO PARA ESTE CHAT: La persona pidió un trato más educado. Cero groserías, cero jerga callejera pesada, frases más cuidadas y corteses — pero sin sonar robótico ni frío, sigue siendo cercano y amable, solo más pulido.`
+  normal: `\n\n🔧 AJUSTE DE TONO PARA ESTE CHAT: nada de groserías ni burla pesada. Cálido, alegre, jerga peruana ligera, sin garabatos.`,
+  elegante: `\n\n🔧 AJUSTE DE TONO PARA ESTE CHAT: cero groserías, cero jerga callejera pesada, frases cuidadas y corteses, pero cercano.`
 };
 
 function detectarCambioTono(texto) {
   const t = texto.toLowerCase();
-
   const pideNormal = ['ya no seas grosero', 'habla normal', 'sin groserias', 'sin groserías',
     'menos grosero', 'se mas serio', 'sé más serio', 'no seas tan grosero', 'baja el tono',
     'habla bien'].some(p => t.includes(p));
@@ -191,6 +188,21 @@ function mensajeConfirmacionTono(nivel) {
 let sockActivo = null;
 let ultimaActividadDueño = Date.now();
 
+// ------------------- MEMORIA CORTA POR CHAT -------------------
+const memoriaCorta = new Map();
+function agregarAMemoriaCorta(jid, texto, respuesta) {
+  if (!memoriaCorta.has(jid)) memoriaCorta.set(jid, []);
+  const lista = memoriaCorta.get(jid);
+  lista.push({ texto, respuesta });
+  if (lista.length > 3) lista.shift();
+}
+function obtenerContextoCorto(jid) {
+  const lista = memoriaCorta.get(jid) || [];
+  if (lista.length === 0) return '';
+  return '\n\nHISTORIAL RECIENTE DE ESTE CHAT:\n' +
+    lista.map(m => `Persona dijo: "${m.texto}"\nRespondiste: "${m.respuesta}"`).join('\n---\n');
+}
+
 // ------------------- BUFFER DE MENSAJES SEGUIDOS -------------------
 const TIEMPO_ESPERA_BUFFER_MS = 5000;
 const bufferMensajes = new Map();
@@ -201,9 +213,7 @@ function bufferizarMensaje(sock, remitente, texto, nombreContacto) {
   }
   const entrada = bufferMensajes.get(remitente);
   entrada.textos.push(texto);
-
   if (entrada.timeout) clearTimeout(entrada.timeout);
-
   entrada.timeout = setTimeout(async () => {
     const textoCombinado = entrada.textos.join('\n');
     bufferMensajes.delete(remitente);
@@ -215,7 +225,7 @@ function bufferizarMensaje(sock, remitente, texto, nombreContacto) {
   }, TIEMPO_ESPERA_BUFFER_MS);
 }
 
-// ------------------- MODO JEFE (autenticación por contraseña) -------------------
+// ------------------- MODO JEFE -------------------
 const modoJefe = new Map();
 let botActivo = true;
 let estiloGlobalExtra = '';
@@ -239,9 +249,10 @@ function detectarSalidaModoJefe(texto) {
     'cierra sesion', 'cierra sesión', 'ya termine', 'ya terminé'].some(p => t === p || t.includes(p));
 }
 
-// ------------------- HISTORIAL DE CONVERSACIONES -------------------
+// ------------------- HISTORIAL: POR CHAT Y GLOBAL -------------------
 const historialChats = new Map();
 const nombresConocidos = new Map();
+const historialGlobal = []; // últimos mensajes de TODOS los chats, más recientes al final
 
 function guardarEnHistorial(jid, nombreContacto, texto, respuesta) {
   nombresConocidos.set(jid, nombreContacto);
@@ -249,25 +260,28 @@ function guardarEnHistorial(jid, nombreContacto, texto, respuesta) {
   const lista = historialChats.get(jid);
   lista.push({ texto, respuesta, tiempo: new Date().toLocaleString('es-PE') });
   if (lista.length > 20) lista.shift();
+
+  historialGlobal.push({ jid, nombre: nombreContacto, texto, respuesta, tiempo: new Date().toLocaleString('es-PE') });
+  if (historialGlobal.length > 50) historialGlobal.shift();
 }
 async function generarRespuestaIA(prompt, notasExtra) {
   let reglasFinales = REGLAS_IA_BASE;
-  if (notasExtra) reglasFinales += `\n\nCONTEXTO ADICIONAL SOBRE ESTA PERSONA/SITUACIÓN: ${notasExtra}`;
+  if (notasExtra) reglasFinales += `\n\nCONTEXTO ADICIONAL: ${notasExtra}`;
   if (estiloGlobalExtra) {
     reglasFinales += `\n\n🔧 DIRECTIVA GLOBAL ACTIVA (aplica a TODOS los chats, tiene prioridad): ${estiloGlobalExtra}`;
   }
   if (chistesSobreCreadorPermitidos) {
-    reglasFinales += `\n\n🎭 PERMISO ESPECIAL ACTIVADO POR EL DUEÑO: se te ha dado permiso de hacer chistes ligeros y con cariño sobre ${CREADOR} cuando venga al caso, sin pasarte de la raya ni faltarle el respeto de verdad.`;
+    reglasFinales += `\n\n🎭 PERMISO ESPECIAL: puedes hacer chistes ligeros y con cariño sobre ${CREADOR} cuando venga al caso, sin faltarle el respeto de verdad.`;
   }
   if (cuotaCasiAgotada()) {
-    reglasFinales += `\n\n⚠️ Estamos casi al límite de solicitudes del día — responde MUY corto (1-2 líneas máximo), sin sacrificar el tono pero economizando palabras.`;
+    reglasFinales += `\n\n⚠️ Casi al límite del día — responde MUY corto (1-2 líneas).`;
   }
 
   const intentar = async (ai, modelo) => {
     const res = await ai.models.generateContent({
       model: modelo,
       contents: prompt,
-      config: { systemInstruction: reglasFinales, safetySettings: SAFETY_SETTINGS }
+      config: { systemInstruction: reglasFinales, safetySettings: SAFETY_SETTINGS, maxOutputTokens: MAX_TOKENS_RESPUESTA }
     });
     return res.text;
   };
@@ -316,8 +330,8 @@ async function validarNombrePropuesto(textoUsuario) {
   const instruccionSistema = 'Eres un clasificador estricto. Tu única tarea es determinar si un texto contiene un nombre propio o apodo real de persona.';
   const prompt = `Texto a evaluar: "${textoUsuario}"
 
-Si ES un nombre o apodo real de persona (nombre propio, sobrenombre común, como se llamaría alguien), responde EXACTAMENTE ese nombre/apodo tal cual, sin comillas ni explicación.
-Si NO es un nombre de persona (es un objeto, una frase, "no sé", "así está bien", una grosería suelta, o cualquier cosa que no sea un nombre real), responde EXACTAMENTE: NO
+Si ES un nombre o apodo real de persona, responde EXACTAMENTE ese nombre/apodo tal cual, sin comillas ni explicación.
+Si NO es un nombre de persona, responde EXACTAMENTE: NO
 
 Responde solo con eso, nada más.`;
 
@@ -388,14 +402,12 @@ async function procesarComandoAdmin(sock, texto) {
     });
     return true;
   }
-
   if (comando === '!ff') {
     await sock.sendMessage(JID_DUEÑO, {
-      text: `🎮 Catálogo Free Fire (edítalo en el código, sección !ff):\n- Hologramas\n- Aimbot\n- Regedit\n- Archivos data\n- Paneles PC/Android`
+      text: `🎮 Catálogo Free Fire:\n- Hologramas\n- Aimbot\n- Regedit\n- Archivos data\n- Paneles PC/Android`
     });
     return true;
   }
-
   if (comando === '!nota') {
     const numero = partes[1];
     const notaTexto = partes.slice(2).join(' ');
@@ -403,12 +415,10 @@ async function procesarComandoAdmin(sock, texto) {
       await sock.sendMessage(JID_DUEÑO, { text: 'Uso: !nota 519XXXXXXXX texto de la nota' });
       return true;
     }
-    const jidObjetivo = `${numero}@s.whatsapp.net`;
-    agregarNota(jidObjetivo, notaTexto);
+    agregarNota(`${numero}@s.whatsapp.net`, notaTexto);
     await sock.sendMessage(JID_DUEÑO, { text: `✅ Nota agregada para ${numero}` });
     return true;
   }
-
   if (comando === '!recuerdame') {
     const minutos = parseInt(partes[1], 10);
     const notaTexto = partes.slice(2).join(' ');
@@ -420,48 +430,47 @@ async function procesarComandoAdmin(sock, texto) {
     await sock.sendMessage(JID_DUEÑO, { text: `⏰ Te recuerdo en ${minutos} min: "${notaTexto}"` });
     return true;
   }
-
-  if (comando === '/apagado') {
-    botActivo = false;
-    await sock.sendMessage(JID_DUEÑO, { text: '🔴 Bot apagado en todos los chats.' });
-    return true;
-  }
-
-  if (comando === '/encendido') {
-    botActivo = true;
-    await sock.sendMessage(JID_DUEÑO, { text: '🟢 Bot encendido, respondiendo normal otra vez.' });
-    return true;
-  }
-
   return false;
 }
 
-async function generarInformeIA() {
+// ------------------- INFORME NATURAL (redactado por la IA, no plantilla fija) -------------------
+async function generarInformeNatural() {
   const uptimeH = ((Date.now() - estado.inicio) / 3600000).toFixed(1);
-  return `📋 *Informe de CRISS BOT*
+  const datosCrudos = {
+    activo: botActivo,
+    uptimeHoras: uptimeH,
+    recibidos: estado.mensajesRecibidos,
+    respondidos: estado.mensajesEnviados,
+    cuotaUsada: contadorCuota.usados,
+    cuotaLimite: LIMITE_DIARIO_ESTIMADO,
+    modelo: MODELO_PRINCIPAL,
+    reconexiones: estado.intentosReconexion,
+    ultimaFalla: estado.ultimoError || 'ninguna registrada'
+  };
 
-Estado: ${botActivo ? '🟢 Activo y respondiendo' : '🔴 Apagado (modo silencio)'}
-Uptime: ${uptimeH}h
-Mensajes recibidos: ${estado.mensajesRecibidos}
-Mensajes respondidos: ${estado.mensajesEnviados}
-Uso de IA hoy: ${contadorCuota.usados}/${LIMITE_DIARIO_ESTIMADO}
-Modelo activo: ${MODELO_PRINCIPAL}
-Chistes sobre ti: ${chistesSobreCreadorPermitidos ? 'permitidos' : 'no permitidos'}
-Reconexiones: ${estado.intentosReconexion}
-Última falla: ${estado.ultimoError || 'ninguna registrada'}`;
+  const instruccion = `Eres ${NOMBRE_BOT} hablándole a ${CREADOR}, tu creador, en modo asistente ejecutivo formal pero cercano. Te doy datos técnicos crudos del bot en JSON. Redacta un informe CONVERSACIONAL, natural, en 5-7 líneas máximo, explicando cómo está funcionando todo. Si hay una falla reciente, menciónala en términos simples y humanos (no jerga técnica cruda), y aclara si parece algo grave o algo normal/resuelto. No uses formato de plantilla ni etiquetas tipo "Estado:", habla como si se lo estuvieras contando de palabra.
+
+Datos: ${JSON.stringify(datosCrudos)}`;
+
+  try {
+    return await consultaIAsimple(instruccion, 'Dame el informe.');
+  } catch (err) {
+    return 'Tuve un problema generando el informe justo ahora, jefe. Intente de nuevo en un momento.';
+  }
 }
 
 async function clasificarComandoJefe(texto) {
   const instruccion = `Eres un clasificador. El usuario es el DUEÑO de un bot de WhatsApp dándote una instrucción en lenguaje natural. Clasifica su mensaje en UNA de estas categorías exactas, respondiendo SOLO el nombre de la categoría:
 
-INFORME - pide un reporte, informe, estado, estadísticas o cómo está funcionando el bot
+INFORME - pide un reporte, informe, estado, estadísticas, errores o cómo está funcionando el bot
 APAGAR - pide apagar, silenciar o desactivar el bot
 ENCENDER - pide encender, activar o reactivar el bot
-CAMBIAR_TONO - pide cambiar la forma de hablar, personalidad o estilo del bot para todos los chats
-HISTORIAL - pide ver mensajes anteriores, historial o conversación de algún chat/contacto/tema específico
+CAMBIAR_TONO - pide cambiar la forma de hablar del bot a un estilo NUEVO Y ESPECÍFICO para todos los chats (ej: "más formal", "más alegre")
+RESTAURAR_TONO - pide que el bot VUELVA a su forma de ser original/normal/de antes, deshaciendo cualquier cambio de tono previo
+HISTORIAL - pide ver mensajes anteriores, historial o conversación de algún chat/contacto/tema específico, O los últimos mensajes en general de cualquier chat
 PERMITIR_CHISTES_CREADOR - pide que el bot pueda hacer chistes o bromas sobre su creador
-PROHIBIR_CHISTES_CREADOR - pide que el bot deje de hacer chistes sobre su creador, vuelva al respeto normal
-SALIR - pide salir del modo jefe, volver al modo normal, terminar sesión de administrador
+PROHIBIR_CHISTES_CREADOR - pide que el bot deje de hacer chistes sobre su creador
+SALIR - pide salir del modo jefe, volver al modo normal
 OTRO - cualquier otra cosa, charla normal o pregunta general
 
 Mensaje del dueño: "${texto}"
@@ -476,6 +485,7 @@ Responde solo con la categoría, nada más.`;
   }
 }
 
+// Busca un chat específico por número o palabra clave; si no encuentra nada, null
 async function buscarHistorialRelevante(consultaTexto) {
   const numeroMatch = consultaTexto.match(/\d{9,}/);
   if (numeroMatch) {
@@ -483,19 +493,30 @@ async function buscarHistorialRelevante(consultaTexto) {
     if (historialChats.has(jid)) return { jid, nombre: nombresConocidos.get(jid) || numeroMatch[0] };
   }
 
-  const instruccion = `Extrae SOLO la palabra clave o tema principal que el usuario quiere buscar en un historial de chats. Responde solo esa palabra o frase corta, nada más.`;
-  let palabraClave = '';
+  const instruccion = `El usuario quiere buscar en un historial de chats. Si menciona un TEMA o PALABRA CLAVE específica (ej: "amoroso", "trabajo", "Free Fire"), respóndela tal cual, corta. Si NO menciona ningún tema específico y solo pide "los últimos mensajes" en general, responde exactamente: GENERAL`;
+  let resultado = '';
   try {
-    palabraClave = (await consultaIAsimple(instruccion, consultaTexto)).trim().toLowerCase();
-  } catch (err) { /* continúa sin palabra clave */ }
+    resultado = (await consultaIAsimple(instruccion, consultaTexto)).trim();
+  } catch (err) {
+    return null;
+  }
 
+  if (resultado.toUpperCase() === 'GENERAL') return { general: true };
+
+  const palabraClave = resultado.toLowerCase();
   for (const [jid, lista] of historialChats.entries()) {
     const textoCompleto = lista.map(m => m.texto + ' ' + m.respuesta).join(' ').toLowerCase();
-    if (palabraClave && textoCompleto.includes(palabraClave)) {
+    if (textoCompleto.includes(palabraClave)) {
       return { jid, nombre: nombresConocidos.get(jid) || jid.split('@')[0] };
     }
   }
-  return null;
+  return { general: true }; // si no encontró nada específico, cae al global igual
+}
+
+function extraerCantidadSolicitada(texto) {
+  const match = texto.match(/\b(\d{1,2})\b/); // números cortos, no confundir con teléfonos
+  const n = match ? parseInt(match[1], 10) : 4;
+  return Math.min(Math.max(n, 1), 15);
 }
 
 async function procesarComandoJefe(sock, remitenteJefe, texto) {
@@ -514,7 +535,7 @@ async function procesarComandoJefe(sock, remitenteJefe, texto) {
   }
 
   if (categoria === 'INFORME') {
-    const informe = await generarInformeIA();
+    const informe = await generarInformeNatural();
     await sock.sendMessage(remitenteJefe, { text: informe });
     return;
   }
@@ -534,13 +555,15 @@ async function procesarComandoJefe(sock, remitenteJefe, texto) {
   if (categoria === 'CAMBIAR_TONO') {
     const instruccion = `Convierte la instrucción del usuario en una directiva de tono corta y clara para un asistente de IA, en máximo 2 líneas.`;
     let nuevaDirectiva = '';
-    try {
-      nuevaDirectiva = (await consultaIAsimple(instruccion, texto)).trim();
-    } catch (err) {
-      nuevaDirectiva = '';
-    }
+    try { nuevaDirectiva = (await consultaIAsimple(instruccion, texto)).trim(); } catch (err) { nuevaDirectiva = ''; }
     estiloGlobalExtra = nuevaDirectiva;
     await sock.sendMessage(remitenteJefe, { text: `✅ Tono actualizado para TODOS los chats:\n"${nuevaDirectiva}"` });
+    return;
+  }
+
+  if (categoria === 'RESTAURAR_TONO') {
+    estiloGlobalExtra = ''; // esto es lo que faltaba: de verdad borrar el override guardado
+    await sock.sendMessage(remitenteJefe, { text: '✅ Listo jefe, el bot volvió a su forma de ser original en todos los chats.' });
     return;
   }
 
@@ -557,28 +580,38 @@ async function procesarComandoJefe(sock, remitenteJefe, texto) {
   }
 
   if (categoria === 'HISTORIAL') {
+    const cantidad = extraerCantidadSolicitada(texto);
     const encontrado = await buscarHistorialRelevante(texto);
-    if (!encontrado) {
-      await sock.sendMessage(remitenteJefe, { text: 'No encontré ningún chat que coincida con eso, jefe.' });
+
+    if (encontrado && !encontrado.general) {
+      const lista = historialChats.get(encontrado.jid) || [];
+      const ultimos = lista.slice(-cantidad);
+      if (ultimos.length === 0) {
+        await sock.sendMessage(remitenteJefe, { text: `No hay historial guardado para ${encontrado.nombre}.` });
+        return;
+      }
+      const resumen = ultimos.map(m => `👤 ${m.texto}\n🤖 ${m.respuesta}`).join('\n\n');
+      await sock.sendMessage(remitenteJefe, { text: `📜 Últimos mensajes con *${encontrado.nombre}*:\n\n${resumen}` });
       return;
     }
-    const lista = historialChats.get(encontrado.jid) || [];
-    const ultimos = lista.slice(-6);
-    if (ultimos.length === 0) {
-      await sock.sendMessage(remitenteJefe, { text: `No hay historial guardado para ${encontrado.nombre}.` });
+
+    // Caso general: últimos N mensajes de CUALQUIER chat
+    const ultimosGlobales = historialGlobal.slice(-cantidad);
+    if (ultimosGlobales.length === 0) {
+      await sock.sendMessage(remitenteJefe, { text: 'Aún no hay mensajes registrados en el historial, jefe.' });
       return;
     }
-    const resumen = ultimos.map(m => `👤 ${m.texto}\n🤖 ${m.respuesta}`).join('\n\n');
-    await sock.sendMessage(remitenteJefe, { text: `📜 Últimos mensajes con *${encontrado.nombre}*:\n\n${resumen}` });
+    const resumen = ultimosGlobales.map(m => `👤 *${m.nombre}*: ${m.texto}\n🤖 ${m.respuesta}`).join('\n\n');
+    await sock.sendMessage(remitenteJefe, { text: `📜 Últimos ${ultimosGlobales.length} mensajes recibidos por el bot:\n\n${resumen}` });
     return;
   }
 
-  const reglasJefe = `Le hablas directamente a ${CREADOR}, tu creador, en modo formal de asistente ejecutivo — como un empleado de confianza hablándole a su jefe. Respetuoso, directo, profesional pero cercano. Sin groserías, sin choreo, sin jerga callejera. Responde su consulta de forma clara y útil, en pocas líneas.`;
+  const reglasJefe = `Le hablas directamente a ${CREADOR}, tu creador, en modo formal de asistente ejecutivo. Respetuoso, directo, profesional pero cercano. Sin groserías, sin choreo. Responde en pocas líneas.`;
   try {
     const res = await aiPrincipal.models.generateContent({
       model: MODELO_PRINCIPAL,
       contents: texto,
-      config: { systemInstruction: reglasJefe, safetySettings: SAFETY_SETTINGS }
+      config: { systemInstruction: reglasJefe, safetySettings: SAFETY_SETTINGS, maxOutputTokens: MAX_TOKENS_RESPUESTA }
     });
     registrarUsoIA();
     await sock.sendMessage(remitenteJefe, { text: res.text });
@@ -626,7 +659,7 @@ async function procesarMensajeUsuario(sock, remitente, texto, nombreContacto) {
 
     let notas = '';
     if (esAmigoEspecial(nombreContacto)) {
-      notas += `Esta persona (${nombreAUsar}) es pana cercano de confianza de ${CREADOR} — trátalo con cariño extra, más choteo, sin insultos pesados igual. `;
+      notas += `Esta persona (${nombreAUsar}) es pana cercano de confianza de ${CREADOR} — trátalo con cariño extra, sin insultos pesados igual. `;
     }
     const notasGuardadas = obtenerNotas(remitente);
     if (notasGuardadas.length) {
@@ -634,18 +667,20 @@ async function procesarMensajeUsuario(sock, remitente, texto, nombreContacto) {
     }
     const horasSinDueño = (Date.now() - ultimaActividadDueño) / 3600000;
     if (horasSinDueño > 6) {
-      notas += `Alberto lleva varias horas sin conectarse — si viene al caso puedes mencionar casualmente que anda ausente/durmiendo, sin exagerar. `;
+      notas += `Alberto lleva varias horas sin conectarse — si viene al caso puedes mencionar casualmente que anda ausente/durmiendo. `;
     }
 
     const nivelTono = tonoPersonal.get(remitente) || 'grosero';
     notas += INSTRUCCIONES_TONO[nivelTono];
+    notas += obtenerContextoCorto(remitente);
 
     const encabezado = primeraVezIA
-      ? `Consulta de ${nombreAUsar} (usa este nombre/apodo si vas a mencionarlo). Puede venir en varias líneas si la persona mandó varios mensajitos seguidos — interprétalo como una sola idea completa.`
-      : `Consulta (si mencionas a la persona, usa "${nombreAUsar}", NO el nombre de WhatsApp). Puede venir en varias líneas si la persona mandó varios mensajitos seguidos — interprétalo como una sola idea completa.`;
+      ? `Consulta de ${nombreAUsar} (usa este nombre/apodo si vas a mencionarlo). Puede venir en varias líneas si mandó varios mensajitos seguidos — interprétalo como una sola idea completa.`
+      : `Consulta (si mencionas a la persona, usa "${nombreAUsar}", NO el nombre de WhatsApp). Puede venir en varias líneas si mandó varios mensajitos seguidos — interprétalo como una sola idea completa.`;
 
     const respuestaTexto = await generarRespuestaIA(`${encabezado} Mensaje: ${texto}`, notas || null);
     await enviarRespuestaHumanizada(sock, remitente, respuestaTexto);
+    agregarAMemoriaCorta(remitente, texto, respuestaTexto);
     guardarEnHistorial(remitente, nombreAUsar, texto, respuestaTexto);
     estado.mensajesEnviados++;
     console.log(`✅ Respondí a: ${nombreAUsar} (${remitente})`);
@@ -724,15 +759,23 @@ async function iniciarBot() {
 
     if (msg.key.fromMe) {
       ultimaActividadDueño = Date.now();
-      const textoPropio = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-      if (remitente === JID_DUEÑO && textoPropio.trim().startsWith('!')) {
+      const textoPropio = (msg.message.conversation || msg.message.extendedTextMessage?.text || '').trim().toLowerCase();
+
+      if (textoPropio === '/apagado') {
+        botActivo = false;
+        await sock.sendMessage(remitente, { text: '🔴 Bot apagado en TODOS los chats.' });
+        return;
+      }
+      if (textoPropio === '/encendido') {
+        botActivo = true;
+        await sock.sendMessage(remitente, { text: '🟢 Bot encendido, respondiendo normal en todos los chats otra vez.' });
+        return;
+      }
+      if (remitente === JID_DUEÑO && textoPropio.startsWith('!')) {
         const fueComando = await procesarComandoAdmin(sock, textoPropio);
         if (fueComando) return;
       }
-      if (remitente === JID_DUEÑO && (textoPropio.trim().toLowerCase() === '/apagado' || textoPropio.trim().toLowerCase() === '/encendido')) {
-        const fueComando = await procesarComandoAdmin(sock, textoPropio.trim().toLowerCase());
-        if (fueComando) return;
-      }
+
       pausaHasta.set(remitente, Date.now() + DURACION_PAUSA_MS);
       return;
     }
@@ -927,11 +970,9 @@ app.get('/', (req, res) => {
       document.getElementById('reint').textContent = d.intentosReconexion;
       const h = Math.floor(d.uptimeSegundos / 3600), m = Math.floor((d.uptimeSegundos % 3600) / 60), s = d.uptimeSegundos % 60;
       document.getElementById('uptime').textContent = h + 'h ' + m + 'm ' + s + 's';
-
       document.getElementById('cuotaTexto').textContent = d.cuotaUsada + ' / ' + d.cuotaLimite;
       const pct = Math.min(100, Math.round((d.cuotaUsada / d.cuotaLimite) * 100));
       document.getElementById('cuotaBarra').style.width = pct + '%';
-
       document.getElementById('ramUsada').textContent = d.infraestructura.ramUsadaMB + ' MB';
       document.getElementById('node').textContent = d.infraestructura.nodeVersion;
       document.getElementById('plataforma').textContent = d.infraestructura.plataforma;
