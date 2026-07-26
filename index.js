@@ -9,7 +9,7 @@ const os = require('os');
 // ------------------- TUS DATOS -------------------
 const CLAVE_IA_PRINCIPAL = process.env.CLAVE_IA_PRINCIPAL;
 const CLAVE_IA_RESPALDO = process.env.CLAVE_IA_RESPALDO;
-const CONTRASEÑA_DUEÑO = process.env.CONTRASEÑA_DUEÑO;
+const CONTRASEÑA_DUEÑO = process.env.CONTRASENA_DUENO;
 const MODELO_PRINCIPAL = 'gemini-3.6-flash';
 const MODELO_RESPALDO = 'gemini-3.6-flash';
 const NOMBRE_BOT = 'Criss Bot';
