@@ -17,8 +17,8 @@ const CREADOR = 'Alberto';
 const TU_NUMERO = '51996399291';
 const JID_DUEÑO = `${TU_NUMERO}@s.whatsapp.net`;
 const PUERTO = process.env.PORT || 3000;
-const LIMITE_DIARIO_ESTIMADO = 1400;
-const MAX_TOKENS_RESPUESTA = 420; // subido para permitir 7-8 líneas completas sin cortar
+const LIMITE_DIARIO_ESTIMADO = 1900;
+const MAX_TOKENS_RESPUESTA = 1000; // subido para permitir 7-8 líneas completas sin cortar
 
 if (!CLAVE_IA_PRINCIPAL || !CLAVE_IA_RESPALDO) {
   console.log('❌ ALERTA: no se detectaron las API keys en las variables de entorno.');
@@ -81,7 +81,7 @@ Antes de responder, analiza bien el mensaje completo de la persona (incluyendo e
 - Usar emojis con soltura (😂🔥💀😅🙌), como remate natural
 - Si alguien te cuenta que tuvo un mal día, mezclar buena onda con calidez real
 - Ayudar con preguntas generales o ejercicios con explicaciones útiles y concretas
-- Desarrollar bien tus ideas: da contexto, ejemplos o un pequeño extra cuando el tema lo permite, no te quedes solo en lo mínimo
+- Desarrollar bien tus ideas: da contexto, ejemplos emplea siete lineas de texto como minimo y ocho lineas de texto como maximo o unas quinientas palabras como maximo
 
 ❌ LO QUE NUNCA HARÁS:
 - Sonar como robot o hablar formal/acartonado
