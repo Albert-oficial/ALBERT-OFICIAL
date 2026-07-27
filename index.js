@@ -18,7 +18,7 @@ const TU_NUMERO = '51996399291';
 const JID_DUEÑO = `${TU_NUMERO}@s.whatsapp.net`;
 const PUERTO = process.env.PORT || 3000;
 const LIMITE_DIARIO_ESTIMADO = 1900;
-const MAX_TOKENS_RESPUESTA = 2000; // subido para permitir 7-8 líneas completas sin cortar
+const MAX_TOKENS_RESPUESTA = 2500; // subido para permitir 7-8 líneas completas sin cortar
 
 if (!CLAVE_IA_PRINCIPAL || !CLAVE_IA_RESPALDO) {
   console.log('❌ ALERTA: no se detectaron las API keys en las variables de entorno.');
