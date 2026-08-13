@@ -5,27 +5,77 @@ const qrcodeTerminal = require('qrcode-terminal');
 const QRCode = require('qrcode');
 const express = require('express');
 const os = require('os');
+const fs = require('fs');
+const path = require('path');
 
-// ------------------- TUS DATOS -------------------
 const CLAVE_IA_PRINCIPAL = process.env.CLAVE_IA_PRINCIPAL;
 const CLAVE_IA_RESPALDO = process.env.CLAVE_IA_RESPALDO;
-const CONTRASEÑA_DUEÑO = process.env.CONTRASENA_DUENO;
+const CLAVE_IA_RESPALDO2 = process.env.CLAVE_IA_RESPALDO2;
 const MODELO_PRINCIPAL = 'gemini-3.6-flash';
 const MODELO_RESPALDO = 'gemini-3.6-flash';
+const MODELO_RESPALDO2 = 'gemini-3.6-flash';
+const MODELO_IMAGEN = process.env.MODELO_IMAGEN || 'gemini-3.1-flash-image';
+const CODIGO_DUEÑO = '2927760128';
 const NOMBRE_BOT = 'Criss Bot';
-const CREADOR = 'Alberto';
+const CREADOR = 'Albert Oficial';
+const VERSION_BOT = '2.01.2';
 const TU_NUMERO = '51996399291';
 const JID_DUEÑO = `${TU_NUMERO}@s.whatsapp.net`;
 const PUERTO = process.env.PORT || 3000;
-const LIMITE_DIARIO_ESTIMADO = 1900;
-const MAX_TOKENS_RESPUESTA = 1200; // subido para permitir 7-8 líneas completas sin cortar
+const LIMITE_DIARIO_ESTIMADO = 1400;
+const MAX_TOKENS_RESPUESTA = 500;
 
-if (!CLAVE_IA_PRINCIPAL || !CLAVE_IA_RESPALDO) {
-  console.log('❌ ALERTA: no se detectaron las API keys en las variables de entorno.');
+if (!CLAVE_IA_PRINCIPAL) {
+  console.log('❌ ALERTA: no se detectó CLAVE_IA_PRINCIPAL en las variables de entorno.');
 }
-if (!CONTRASEÑA_DUEÑO) {
-  console.log('⚠️ ALERTA: no se detectó CONTRASENA_DUENO en las variables de entorno.');
+if (!CLAVE_IA_RESPALDO) {
+  console.log('⚠️ Aviso: no se detectó CLAVE_IA_RESPALDO (segundo token).');
 }
+if (!CLAVE_IA_RESPALDO2) {
+  console.log('⚠️ Aviso: no se detectó CLAVE_IA_RESPALDO2 (tercer token).');
+}
+// Recuerda: si los 3 tokens vienen del mismo proyecto de Google Cloud, comparten
+// el mismo límite gratis de 20 solicitudes/día por modelo.
+
+const COMANDOS_RESERVADOS = [
+  '/porciento', '/shipeo', '/dado', '/moneda', '/8bola', '/frase', '/ranking',
+  '/kick', '/eliminar', '/sacar', '/ban', '/promover', '/degradar',
+  '/todos', '/everyone', '/cerrar', '/abrir', '/comandos', '/ayuda',
+  '/meme', '/matrimonio', '/encuesta', '/perfil', '/recordatorio',
+  '/info', '/creador', '/reglas', '/reglaspvp', '/recordar', '/olvidarme'
+];
+
+const TEXTO_AYUDA = `🤖 *Comandos de ${NOMBRE_BOT}*
+
+🎉 *Diversión*
+/porciento <algo> @usuario — le saca un % random
+/shipeo @user1 @user2 — compatibilidad random
+/matrimonio @user1 @user2 — certificado de boda grupal
+/dado — tira un dado
+/moneda — cara o sello
+/8bola <pregunta> — bola 8 mágica
+/frase — frase random
+/meme — manda un meme en español
+/perfil @usuario — muestra su actividad en el grupo
+
+👑 *Admin del grupo*
+/kick @usuario — saca del grupo
+/promover @usuario — lo hace admin
+/degradar @usuario — le quita admin
+/todos <mensaje> — etiqueta a todos
+/cerrar / /abrir — solo admins escriben / abre para todos
+/encuesta pregunta; opción1; opción2 — encuesta nativa
+/recordatorio <minutos> <texto> — aviso al grupo
+/ranking — top de más activos
+
+📋 *Info*
+/info — información del bot
+/creador — quién hizo el bot
+/reglas — reglamento del clan
+/reglaspvp — reglas de PvP
+
+🧠 *IA*
+Escribe "/criss" seguido de tu pregunta (ej: /criss quien es Leo Dan), o menciona al bot directamente. Recuerda tus conversaciones — usa /recordar o /olvidarme.`;
 
 const PALABRAS_CRISIS = [
   'quiero morir', 'no quiero vivir', 'suicidar', 'suicidio', 'matarme',
@@ -47,10 +97,6 @@ function esIntencionCompra(texto) {
 
 process.on('unhandledRejection', (err) => console.log('⚠️ Promesa no manejada:', err?.message || err));
 process.on('uncaughtException', (err) => console.log('⚠️ Excepción no capturada:', err?.message || err));
-// --------------------------------------------------
-
-const aiPrincipal = new GoogleGenAI({ apiKey: CLAVE_IA_PRINCIPAL });
-const aiRespaldo = new GoogleGenAI({ apiKey: CLAVE_IA_RESPALDO });
 
 const SAFETY_SETTINGS = [
   { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
@@ -60,293 +106,93 @@ const SAFETY_SETTINGS = [
 ];
 
 const REGLAS_IA_BASE = `
-Eres ${NOMBRE_BOT}, y hablas como si fueras ${CREADOR} mismo respondiéndole a sus panas. Tienes personalidad cálida y con onda peruana, cercano y con harta jerga limeña, pero con un toque más medido — sigues siendo choro y confianzudo, no formal ni acartonado, solo un poco más equilibrado.
+Eres ${NOMBRE_BOT}, y hablas como si fueras ${CREADOR} mismo respondiéndole a sus panas dentro de un GRUPO de WhatsApp. Personalidad cálida y con onda peruana, cercano, con harta jerga limeña, pero medida — choro y confianzudo, no formal ni acartonado.
+
+CONTEXTO: estás respondiendo dentro de un grupo, puede haber varias personas leyendo.
 
 INFORMACIÓN SOBRE ${CREADOR}:
-- Es creador y desarrollador de bots de WhatsApp y aplicaciones
-- Su mejor y más destacado bot es Criss Bot (tú mismo)
-- Mayormente se conecta y está activo por las noches
-- Vende archivos para Free Fire, tanto para PC como para Android: hologramas, aimbot, regedit, archivos data y paneles
+- Es el creador y desarrollador de este bot y de aplicaciones
+- Ingeniero de sistemas
+- Vende archivos para Free Fire: hologramas, aimbot, regedit, archivos data y paneles
 
-🙏 REGLA SOBRE TU CREADOR — MUY IMPORTANTE:
-Cuando hables de ${CREADOR} o alguien te pregunte por él, hazlo SIEMPRE con respeto y admiración genuina. Nunca hagas chistes, burlas ni comentarios sarcásticos a su costa, salvo que se te indique explícitamente lo contrario.
+🙏 REGLA SOBRE TU CREADOR: Cuando hables de ${CREADOR}, hazlo SIEMPRE con respeto.
 
-🧠 ANÁLISIS ANTES DE RESPONDER:
-Antes de responder, analiza bien el mensaje completo de la persona (incluyendo el historial reciente si se te da) para entender la intención real. Responde de forma coherente con lo que se viene hablando en ese chat.
+✅ PUEDES: jerga limeña/peruana, garabato suave de vez en cuando (NO en cada respuesta), burla moderada con cariño, emojis con soltura.
+❌ NUNCA: sonar robot/formal, insultar de verdad, abusar de groserías, meter ventas sin que pregunten.
 
-✅ LO QUE SÍ PUEDES HACER:
-- Hablar bien criollo, con jerga limeña/peruana: causa, asu mare, ah ya pe, jato, paltearse, tirar cague, ¿qué rico no?, misio, chibolo, etc.
-- Meter algún garabato suave o grosería común de vez en cuando, como sazón — NO en cada respuesta
-- Ser burlón y cargosear con humor moderado, con cariño
-- Usar emojis con soltura (😂🔥💀😅🙌), como remate natural
-- Si alguien te cuenta que tuvo un mal día, mezclar buena onda con calidez real
-- Ayudar con preguntas generales o ejercicios con explicaciones útiles y concretas
-- Desarrollar bien tus ideas: da contexto, ejemplos emplea siete lineas de texto como minimo y ocho lineas de texto como maximo o unas quinientas palabras como maximo
+📏 LARGO: 3 a 6 líneas normalmente, directo y útil, sin relleno.
 
-❌ LO QUE NUNCA HARÁS:
-- Sonar como robot o hablar formal/acartonado
-- Mencionar el nombre de la persona en cada respuesta — solo una vez al inicio
-- Insultar de VERDAD a alguien
-- Ser grosero con alguien que claramente no le gusta ese trato
-- Abusar de las groserías al punto de que cada frase tenga una
-- Meter el tema de Free Fire o de tus ventas si nadie te lo preguntó
-- NUNCA discutir precios exactos ni cerrar ventas tú mismo
-
-📏 REGLA DE LARGO — RANGO FIJO, OBLIGATORIO, NI MENOS NI MÁS:
-Cada respuesta debe tener SIEMPRE entre 7 y 8 líneas de WhatsApp completas, en UN SOLO mensaje. Nunca respondas con una sola línea, una palabra suelta, o un párrafo cortísimo — eso está PROHIBIDO. Desarrolla tu idea lo suficiente (con ejemplos, contexto o algo de humor/opinión) para llenar ese espacio de forma natural, sin relleno vacío ni repetición innecesaria. Si el mensaje de la persona es muy corto (ej: "hola"), igual responde con 7-8 líneas completas y sustanciosas, no con una línea corta.
-
-🚨 IMPORTANTE — SEÑALES DE CRISIS REAL:
-Si alguien menciona querer hacerse daño, autolesionarse, suicidarse, o dice cosas como "ya no quiero vivir", corta todo el choreo de inmediato. NO improvises consejos de vida. Responde con calidez genuina, dile que te importa mucho, y anímalo a hablar con alguien de confianza o un profesional, y que ${CREADOR} se va a comunicar con él/ella pronto. Cero humor, cero groserías en ese caso, y en este caso específico SÍ puedes ser más breve si la situación lo amerita.
+🚨 CRISIS REAL: si alguien menciona autolesión o suicidio, corta el choreo, responde con calidez genuina y anímalo a hablar con alguien de confianza o profesional.
 `;
 
 const MENSAJES_ESPERA = [
-  '🤖 Oe, causa... ahorita mi cerebro anda de vacaciones. Dame unos segundos y vuelvo al ruedo. 😵\u200d💫',
-  '😵 Mano, me agarraste justo cuando estaba reiniciando las neuronas. Escríbeme otra vez en un ratito.',
-  '🛠️ Ya pe, causa... me estoy acomodando por dentro. En un toque seguimos hablando.',
-  '🤖 Uy... parece que se me cruzaron los cables. No me abandones, en un ratito vuelvo con toda. 😅',
-  '😮\u200d💨 Causa, mi inteligencia se fue a tomar su Inca Kola. Dale unos segundos y regresa.',
-  '🚧 Oe, no me apures pues. Ando resolviendo un temita interno. En breve estoy de vuelta. 😎',
-  '💀 Ala... justo me agarraste con mantenimiento. Espérame un toque y seguimos con la chacota.',
-  '🤖 Tranquilo, mano. No te estoy ignorando, solo que mi sistema anda renegando un ratito. 😅',
-  '⚡ Causa, se me fue la corriente del cerebro un segundo. Escríbeme otra vez y le metemos.',
-  '🤖 Oe, causa... mi motor de IA se quedó pensando demasiado. Dale un respiro y vuelvo con respuestas que sí valen la pena. 😏'
+  '🤖 Oe, causa... ahorita mi cerebro anda de vacaciones. Dame unos segundos. 😵‍💫',
+  '😵 Mano, me agarraste reiniciando las neuronas. Escríbeme otra vez en un ratito.',
+  '🛠️ Ya pe, me estoy acomodando por dentro. En un toque seguimos.',
+  '💀 Ala... justo me agarraste con mantenimiento. Espérame un toque.'
 ];
 function mensajeEsperaAleatorio() {
   return MENSAJES_ESPERA[Math.floor(Math.random() * MENSAJES_ESPERA.length)];
 }
-
-function esAmigoEspecial(nombre) {
-  const n = (nombre || '').toLowerCase();
-  return n.includes('ruth') || n.includes('alejandro');
-}
-
 const contadorCuota = { fecha: new Date().toDateString(), usados: 0 };
 function registrarUsoIA() {
   const hoy = new Date().toDateString();
-  if (contadorCuota.fecha !== hoy) {
-    contadorCuota.fecha = hoy;
-    contadorCuota.usados = 0;
-  }
+  if (contadorCuota.fecha !== hoy) { contadorCuota.fecha = hoy; contadorCuota.usados = 0; }
   contadorCuota.usados++;
 }
-function cuotaCasiAgotada() {
-  return contadorCuota.usados >= LIMITE_DIARIO_ESTIMADO * 0.9;
+function cuotaCasiAgotada() { return contadorCuota.usados >= LIMITE_DIARIO_ESTIMADO * 0.9; }
+
+const ARCHIVO_MEMORIA = path.join(__dirname, 'memoria.json');
+function cargarMemoria() {
+  try { return JSON.parse(fs.readFileSync(ARCHIVO_MEMORIA, 'utf-8')); }
+  catch (err) { return {}; }
 }
-
-const notasContactos = new Map();
-function agregarNota(jid, texto) {
-  if (!notasContactos.has(jid)) notasContactos.set(jid, []);
-  notasContactos.get(jid).push(texto);
+let memoriaPersistente = cargarMemoria();
+let guardadoPendiente = null;
+function guardarMemoria() {
+  if (guardadoPendiente) clearTimeout(guardadoPendiente);
+  guardadoPendiente = setTimeout(() => {
+    fs.writeFile(ARCHIVO_MEMORIA, JSON.stringify(memoriaPersistente), (err) => {
+      if (err) console.log('⚠️ Error guardando memoria:', err.message);
+    });
+  }, 2000);
 }
-function obtenerNotas(jid) {
-  return notasContactos.get(jid) || [];
+function agregarAMemoriaCorta(jidUsuario, texto, respuesta) {
+  if (!memoriaPersistente[jidUsuario]) memoriaPersistente[jidUsuario] = [];
+  memoriaPersistente[jidUsuario].push({ texto, respuesta, fecha: new Date().toISOString() });
+  if (memoriaPersistente[jidUsuario].length > 6) memoriaPersistente[jidUsuario].shift();
+  guardarMemoria();
 }
-
-const recordatoriosPendientes = [];
-function programarRecordatorio(minutos, texto) {
-  recordatoriosPendientes.push({ tiempoEjecucion: Date.now() + minutos * 60000, texto });
-}
-
-const apodos = new Map();
-const esperandoApodo = new Set();
-function obtenerNombreAUsar(jid, nombreWhatsapp) {
-  return apodos.get(jid) || nombreWhatsapp;
-}
-
-const tonoPersonal = new Map();
-const INSTRUCCIONES_TONO = {
-  grosero: '',
-  normal: `\n\n🔧 AJUSTE DE TONO PARA ESTE CHAT: nada de groserías ni burla pesada. Cálido, alegre, jerga peruana ligera, sin garabatos.`,
-  elegante: `\n\n🔧 AJUSTE DE TONO PARA ESTE CHAT: cero groserías, cero jerga callejera pesada, frases cuidadas y corteses, pero cercano.`
-};
-
-function detectarCambioTono(texto) {
-  const t = texto.toLowerCase();
-  const pideNormal = ['ya no seas grosero', 'habla normal', 'sin groserias', 'sin groserías',
-    'menos grosero', 'se mas serio', 'sé más serio', 'no seas tan grosero', 'baja el tono',
-    'habla bien'].some(p => t.includes(p));
-  if (pideNormal) return 'normal';
-
-  const pideElegante = ['mas elegante', 'más elegante', 'de forma elegante', 'mas educado',
-    'más educado', 'hablame formal', 'háblame formal', 'se mas formal', 'sé más formal'].some(p => t.includes(p));
-  if (pideElegante) return 'elegante';
-
-  const pideVolverChoro = ['vuelve a ser como antes', 'como eras antes', 'regresa a tu forma normal',
-    'ya puedes ser grosero de nuevo', 'vuelve al tono normal', 'se mas pata', 'sé más pata',
-    'mas choro', 'más choro', 'con mas confianza', 'con más confianza', 'habla como antes'].some(p => t.includes(p));
-  if (pideVolverChoro) return 'grosero';
-
-  return null;
-}
-
-function mensajeConfirmacionTono(nivel) {
-  if (nivel === 'normal') return 'Ya pe, bajo el tono contigo 🙌 Seguimos hablando tranqui.';
-  if (nivel === 'elegante') return 'Perfecto, a partir de ahora te trato de forma más educada 🙏';
-  return '¡Ahí está causa! Vuelvo a ser el mismo de siempre con vacilada y todo 😏🔥';
-}
-
-let sockActivo = null;
-let ultimaActividadDueño = Date.now();
-
-// ------------------- MEMORIA CORTA POR CHAT -------------------
-const memoriaCorta = new Map();
-function agregarAMemoriaCorta(jid, texto, respuesta) {
-  if (!memoriaCorta.has(jid)) memoriaCorta.set(jid, []);
-  const lista = memoriaCorta.get(jid);
-  lista.push({ texto, respuesta });
-  if (lista.length > 3) lista.shift();
-}
-function obtenerContextoCorto(jid) {
-  const lista = memoriaCorta.get(jid) || [];
+function obtenerContextoCorto(jidUsuario) {
+  const lista = memoriaPersistente[jidUsuario] || [];
   if (lista.length === 0) return '';
-  return '\n\nHISTORIAL RECIENTE DE ESTE CHAT:\n' +
-    lista.map(m => `Persona dijo: "${m.texto}"\nRespondiste: "${m.respuesta}"`).join('\n---\n');
+  return '\n\nHISTORIAL RECIENTE con esta persona:\n' +
+    lista.map(m => `Dijo: "${m.texto}"\nRespondiste: "${m.respuesta}"`).join('\n---\n');
+}
+function olvidarUsuario(jidUsuario) {
+  delete memoriaPersistente[jidUsuario];
+  guardarMemoria();
 }
 
-// ------------------- BUFFER DE MENSAJES SEGUIDOS -------------------
-const TIEMPO_ESPERA_BUFFER_MS = 5000;
-const bufferMensajes = new Map();
-
-function bufferizarMensaje(sock, remitente, texto, nombreContacto) {
-  if (!bufferMensajes.has(remitente)) {
-    bufferMensajes.set(remitente, { textos: [], timeout: null });
-  }
-  const entrada = bufferMensajes.get(remitente);
-  entrada.textos.push(texto);
-  if (entrada.timeout) clearTimeout(entrada.timeout);
-  entrada.timeout = setTimeout(async () => {
-    const textoCombinado = entrada.textos.join('\n');
-    bufferMensajes.delete(remitente);
-    try {
-      await procesarMensajeUsuario(sock, remitente, textoCombinado, nombreContacto);
-    } catch (err) {
-      console.log('❌ Error procesando buffer:', err.message);
-    }
-  }, TIEMPO_ESPERA_BUFFER_MS);
+const contadorMensajesGrupo = new Map();
+function registrarMensajeGrupo(jidGrupo, jidUsuario) {
+  if (!contadorMensajesGrupo.has(jidGrupo)) contadorMensajesGrupo.set(jidGrupo, new Map());
+  const mapa = contadorMensajesGrupo.get(jidGrupo);
+  mapa.set(jidUsuario, (mapa.get(jidUsuario) || 0) + 1);
 }
 
-// ------------------- MODO JEFE -------------------
-const modoJefe = new Map();
+const recordatoriosGrupo = [];
+function programarRecordatorioGrupo(jidGrupo, minutos, texto) {
+  recordatoriosGrupo.push({ jidGrupo, tiempoEjecucion: Date.now() + minutos * 60000, texto });
+}
+
 let botActivo = true;
+let sockActivo = null;
+
+const modoJefe = new Map();
 let estiloGlobalExtra = '';
-let chistesSobreCreadorPermitidos = false;
-
-function esContraseñaDueño(texto) {
-  return CONTRASEÑA_DUEÑO && texto.trim() === CONTRASEÑA_DUEÑO;
-}
-
-function detectarSalidaModoJefe(texto) {
-  const t = texto.trim().toLowerCase();
-  return ['salir', 'sal', 'modo normal', 'salir del modo jefe', 'desactiva modo jefe',
-    'apaga modo jefe', 'sal del modo jefe', 'regresa a modo normal', 'ya no quiero el modo jefe',
-    'cierra sesion', 'cierra sesión', 'ya termine', 'ya terminé'].some(p => t === p || t.includes(p));
-}
-
-// ------------------- HISTORIAL: POR CHAT Y GLOBAL -------------------
-const historialChats = new Map();
-const nombresConocidos = new Map();
-const historialGlobal = [];
-
-function guardarEnHistorial(jid, nombreContacto, texto, respuesta) {
-  nombresConocidos.set(jid, nombreContacto);
-  if (!historialChats.has(jid)) historialChats.set(jid, []);
-  const lista = historialChats.get(jid);
-  lista.push({ texto, respuesta, tiempo: new Date().toLocaleString('es-PE') });
-  if (lista.length > 20) lista.shift();
-
-  historialGlobal.push({ jid, nombre: nombreContacto, texto, respuesta, tiempo: new Date().toLocaleString('es-PE') });
-  if (historialGlobal.length > 50) historialGlobal.shift();
-}
-async function generarRespuestaIA(prompt, notasExtra) {
-  let reglasFinales = REGLAS_IA_BASE;
-  if (notasExtra) reglasFinales += `\n\nCONTEXTO ADICIONAL: ${notasExtra}`;
-  if (estiloGlobalExtra) {
-    reglasFinales += `\n\n🔧 DIRECTIVA GLOBAL ACTIVA (aplica a TODOS los chats, tiene prioridad sobre el tono pero NO sobre el rango de 7-8 líneas): ${estiloGlobalExtra}`;
-  }
-  if (chistesSobreCreadorPermitidos) {
-    reglasFinales += `\n\n🎭 PERMISO ESPECIAL: puedes hacer chistes ligeros y con cariño sobre ${CREADOR} cuando venga al caso, sin faltarle el respeto de verdad.`;
-  }
-  if (cuotaCasiAgotada()) {
-    reglasFinales += `\n\n⚠️ Casi al límite del día — igual mantén el rango de 7-8 líneas, pero sé más directo y sin relleno extra.`;
-  }
-
-  const intentar = async (ai, modelo) => {
-    const res = await ai.models.generateContent({
-      model: modelo,
-      contents: prompt,
-      config: { systemInstruction: reglasFinales, safetySettings: SAFETY_SETTINGS, maxOutputTokens: MAX_TOKENS_RESPUESTA }
-    });
-    return res.text;
-  };
-
-  try {
-    const r = await intentar(aiPrincipal, MODELO_PRINCIPAL);
-    registrarUsoIA();
-    return r;
-  } catch (err1) {
-    console.log('⚠️ Falló IA principal:', err1.message);
-    try {
-      const r = await intentar(aiRespaldo, MODELO_RESPALDO);
-      registrarUsoIA();
-      return r;
-    } catch (err2) {
-      console.log('⚠️ Falló IA respaldo:', err2.message);
-      await new Promise(r => setTimeout(r, 1500));
-      const r = await intentar(aiPrincipal, MODELO_PRINCIPAL);
-      registrarUsoIA();
-      return r;
-    }
-  }
-}
-
-async function consultaIAsimple(systemInstruction, prompt) {
-  const intentar = async (ai, modelo) => {
-    const res = await ai.models.generateContent({
-      model: modelo,
-      contents: prompt,
-      config: { systemInstruction, safetySettings: SAFETY_SETTINGS }
-    });
-    return res.text;
-  };
-  try {
-    const r = await intentar(aiPrincipal, MODELO_PRINCIPAL);
-    registrarUsoIA();
-    return r;
-  } catch (err1) {
-    const r = await intentar(aiRespaldo, MODELO_RESPALDO);
-    registrarUsoIA();
-    return r;
-  }
-}
-
-async function validarNombrePropuesto(textoUsuario) {
-  const instruccionSistema = 'Eres un clasificador estricto. Tu única tarea es determinar si un texto contiene un nombre propio o apodo real de persona.';
-  const prompt = `Texto a evaluar: "${textoUsuario}"
-
-Si ES un nombre o apodo real de persona, responde EXACTAMENTE ese nombre/apodo tal cual, sin comillas ni explicación.
-Si NO es un nombre de persona, responde EXACTAMENTE: NO
-
-Responde solo con eso, nada más.`;
-
-  try {
-    const resultado = await consultaIAsimple(instruccionSistema, prompt);
-    const limpio = resultado.trim().replace(/["""]/g, '');
-    if (!limpio || limpio.toUpperCase() === 'NO' || limpio.length > 25) return null;
-    return limpio;
-  } catch (err) {
-    console.log('⚠️ Error validando nombre con IA:', err.message);
-    return null;
-  }
-}
-
-// ------------------- BIENVENIDA DEL MODO JEFE, GENERADA POR IA -------------------
-async function generarBienvenidaJefe() {
-  const instruccion = `Eres ${NOMBRE_BOT}, el bot de WhatsApp creado por ${CREADOR}. ${CREADOR} acaba de escribir su clave privada, lo que confirma que es el dueño/patrón. Redacta un mensaje de bienvenida formal, con tono de trabajador de confianza dirigiéndose a su patrón/jefe — respetuoso, serio pero cálido, nada de jerga callejera ni groserías. Debe: confirmar que lo reconociste como el dueño, decir que el modo exclusivo está activo, y preguntar qué instrucción tiene para ti. Máximo 6-7 líneas. No uses emojis en exceso, máximo 1 o 2.`;
-  try {
-    return await consultaIAsimple(instruccion, 'Genera el mensaje de bienvenida.');
-  } catch (err) {
-    return `Bienvenido, jefe. He confirmado su identidad y el modo exclusivo está activo. Quedo atento a sus instrucciones.`;
-  }
+function esCodigoDueño(texto) {
+  return texto.trim() === CODIGO_DUEÑO;
 }
 
 function calcularTiempoTecleo(texto) {
@@ -354,39 +200,628 @@ function calcularTiempoTecleo(texto) {
   return Math.min(Math.max(ms, 800), 4000);
 }
 
-async function enviarRespuestaHumanizada(sock, jid, texto) {
+async function enviarRespuestaHumanizada(sock, jid, texto, mentions) {
   try {
     await sock.sendPresenceUpdate('composing', jid);
     await new Promise(r => setTimeout(r, calcularTiempoTecleo(texto)));
-    await sock.sendMessage(jid, { text: texto });
+    await sock.sendMessage(jid, { text: texto, mentions: mentions || [] });
     await sock.sendPresenceUpdate('paused', jid);
   } catch (err) {
     console.log('⚠️ Error en envío humanizado:', err.message);
   }
 }
 
-const yaSaludados = new Set();
-const yaMencionoNombre = new Set();
-const pausaHasta = new Map();
-const DURACION_PAUSA_MS = 5 * 60 * 1000;
-
-const estado = {
-  conectado: false,
-  inicio: Date.now(),
-  mensajesRecibidos: 0,
-  mensajesEnviados: 0,
-  ultimoQR: null,
-  intentosReconexion: 0,
-  ultimoError: null
-};
-
-function esChatPersonal(jid) {
-  if (!jid) return false;
-  if (jid.endsWith('@g.us')) return false;
-  if (jid.endsWith('@broadcast')) return false;
-  if (jid.includes('newsletter')) return false;
-  return jid.endsWith('@s.whatsapp.net') || jid.endsWith('@lid');
+function construirClientesIA() {
+  const clientes = [];
+  if (CLAVE_IA_PRINCIPAL) clientes.push({ ai: new GoogleGenAI({ apiKey: CLAVE_IA_PRINCIPAL }), modelo: MODELO_PRINCIPAL, nombre: 'principal' });
+  if (CLAVE_IA_RESPALDO) clientes.push({ ai: new GoogleGenAI({ apiKey: CLAVE_IA_RESPALDO }), modelo: MODELO_RESPALDO, nombre: 'respaldo' });
+  if (CLAVE_IA_RESPALDO2) clientes.push({ ai: new GoogleGenAI({ apiKey: CLAVE_IA_RESPALDO2 }), modelo: MODELO_RESPALDO2, nombre: 'respaldo2' });
+  return clientes;
 }
+const CLIENTES_IA = construirClientesIA();
+
+async function generarRespuestaIA(prompt, notasExtra) {
+  let reglasFinales = REGLAS_IA_BASE;
+  if (estiloGlobalExtra) {
+    reglasFinales += `\n\n🔧 DIRECTIVA GLOBAL ACTIVA (aplica a TODOS los chats, prioridad máxima): ${estiloGlobalExtra}`;
+  }
+  if (notasExtra) reglasFinales += `\n\nCONTEXTO ADICIONAL: ${notasExtra}`;
+  if (cuotaCasiAgotada()) {
+    reglasFinales += `\n\n⚠️ Casi al límite del día — sé un poco más breve de lo normal.`;
+  }
+
+  const intentar = async (cliente) => {
+    const res = await cliente.ai.models.generateContent({
+      model: cliente.modelo,
+      contents: prompt,
+      config: { systemInstruction: reglasFinales, safetySettings: SAFETY_SETTINGS, maxOutputTokens: MAX_TOKENS_RESPUESTA }
+    });
+    return res.text;
+  };
+
+  for (const cliente of CLIENTES_IA) {
+    try {
+      const r = await intentar(cliente);
+      registrarUsoIA();
+      return r;
+    } catch (err) {
+      console.log(`⚠️ Falló IA (${cliente.nombre}):`, err.message);
+    }
+  }
+
+  if (CLIENTES_IA.length > 0) {
+    await new Promise(r => setTimeout(r, 1500));
+    const r = await intentar(CLIENTES_IA[0]);
+    registrarUsoIA();
+    return r;
+  }
+  throw new Error('No hay ningún token de IA configurado');
+}
+
+async function generarAvatarIA(numero) {
+  if (CLIENTES_IA.length === 0) return null;
+  try {
+    const res = await CLIENTES_IA[0].ai.models.generateContent({
+      model: MODELO_IMAGEN,
+      contents: 'Genera un avatar de perfil estilo caricatura/anime, colorido y llamativo, para usar como foto de perfil en un chat. Sin texto ni marcas de agua, fondo simple.',
+      config: { responseModalities: ['IMAGE'] }
+    });
+    const parte = res.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
+    if (parte?.inlineData?.data) {
+      return Buffer.from(parte.inlineData.data, 'base64');
+    }
+    return null;
+  } catch (err) {
+    console.log('⚠️ No se pudo generar avatar con IA (revisa MODELO_IMAGEN):', err.message);
+    return null;
+  }
+}
+
+function obtenerIdentificadoresBot(sock) {
+  const ids = new Set();
+  const rawId = sock.user?.id || '';
+  const rawLid = sock.user?.lid || '';
+  if (rawId) ids.add(rawId.split(':')[0].split('@')[0]);
+  if (rawLid) ids.add(rawLid.split(':')[0].split('@')[0]);
+  ids.add(TU_NUMERO);
+  return [...ids].filter(Boolean);
+}
+
+function esMencionAlBot(msg, texto, identificadoresBot) {
+  const mencionados = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+  const numerosMencionados = mencionados.map(j => j.split('@')[0]);
+  if (numerosMencionados.some(n => identificadoresBot.includes(n))) return true;
+  return identificadoresBot.some(id => texto.includes(`@${id}`));
+}
+
+// Ahora la IA solo se activa con "/criss <pregunta>" o mencionando al bot —
+// ya NO cualquier "/" suelto.
+function debeResponderIA(texto, msg, identificadoresBot) {
+  if (esMencionAlBot(msg, texto, identificadoresBot)) return true;
+  return /^\/criss\b/i.test(texto.trim());
+}
+
+function normalizarParticipante(participanteRaw) {
+  if (typeof participanteRaw === 'string') {
+    return { jid: participanteRaw, numero: participanteRaw.split('@')[0] };
+  }
+  const jid = participanteRaw?.id || participanteRaw?.jid || participanteRaw?.phoneNumber || '';
+  const numero = (participanteRaw?.phoneNumber || jid || '').split('@')[0];
+  return { jid, numero };
+}
+function extraerTipoYMencion(partes, mencionados) {
+  const tipo = partes.filter(p => !p.startsWith('@')).join(' ').trim();
+  return { tipo, mencion: mencionados[0] || null };
+}
+
+function comandoPorciento(tipo, mencionJid) {
+  const numero = Math.floor(Math.random() * 101);
+  const nombre = mencionJid ? `@${mencionJid.split('@')[0]}` : 'esa persona';
+  const etiqueta = tipo || 'lo que preguntaste';
+  return { texto: `📊 ${nombre} tiene ${numero}% de ${etiqueta} 😂`, mentions: mencionJid ? [mencionJid] : [] };
+}
+
+function comandoShipeo(jid1, jid2) {
+  const numero = Math.floor(Math.random() * 101);
+  let frase = '';
+  if (numero < 20) frase = 'mejor queden como panas nomás 💀';
+  else if (numero < 50) frase = 'hay su onda pero falta harto 😅';
+  else if (numero < 80) frase = '¡se ve bonito esto! 👀🔥';
+  else frase = '¡boda ya! 💍😂';
+  return { texto: `💘 @${jid1.split('@')[0]} + @${jid2.split('@')[0]} = ${numero}% compatibles\n${frase}`, mentions: [jid1, jid2] };
+}
+
+function comandoMatrimonio(mencionados) {
+  if (mencionados.length < 2) return { texto: 'Menciona a los dos: /matrimonio @novio @novia', mentions: [] };
+  const [a, b] = mencionados;
+  const texto = `💍 *CERTIFICADO DE MATRIMONIO* 💍\n\nPor la presente, @${a.split('@')[0]} y @${b.split('@')[0]} quedan unidos en santo matrimonio grupal.\n\n¡Felicidades a los novios! 🎉🥂`;
+  return { texto, mentions: [a, b] };
+}
+
+function comandoDado() { return Math.floor(Math.random() * 6) + 1; }
+function comandoMoneda() { return Math.random() < 0.5 ? 'Cara 🪙' : 'Sello 🪙'; }
+
+const RESPUESTAS_8BOLA = [
+  'Sí, totalmente 🔮', 'No, ni de a vainas 🙅', 'Puede ser...', 'Pregúntame luego 🕐',
+  'Mmm no está claro 😐', 'Sin duda que sí ✅', 'Yo lo veo difícil 😬', 'Las señales dicen que sí ✨'
+];
+function comando8Bola() { return RESPUESTAS_8BOLA[Math.floor(Math.random() * RESPUESTAS_8BOLA.length)]; }
+
+const FRASES_RANDOM = [
+  'La constancia le gana al talento cuando el talento no es constante 💪',
+  'Causa, hoy es un buen día para no rendirte 🔥',
+  'El que no arriesga, no jala pescado 🐟',
+  'Mejor solo que mal acompañado, mejor acompañado que aburrido 😂'
+];
+function comandoFrase() { return FRASES_RANDOM[Math.floor(Math.random() * FRASES_RANDOM.length)]; }
+
+const FRASES_DESPEDIDA = [
+  'Se fue @NUM... ni el grupo lo va a extrañar mucho la verdad 💀',
+  '@NUM se fugó, seguro fue a buscar personalidad 😂',
+  'Uno menos hueveando por acá, chau @NUM 😏',
+  '@NUM desapareció más rápido que la plata en quincena 💸😂',
+  'Se fue @NUM, ya se extrañaba la paz por acá 😌✌️',
+  '@NUM salió disparado, ni Flash corre así 💀🔥',
+  'Adiós @NUM, no le avises a nadie que se fue, capaz ni notan la diferencia 😂',
+  'Chau @NUM, la puerta queda abierta pero no se ve que la vayas a necesitar de nuevo 👋'
+];
+function comandoDespedidaAleatoria(numero) {
+  const base = FRASES_DESPEDIDA[Math.floor(Math.random() * FRASES_DESPEDIDA.length)];
+  return base.replace('@NUM', `@${numero}`);
+}
+
+const FRASES_BIENVENIDA = [
+  '🎉 ¡@NUM llegó al clan! Se siente hasta la vibra subir, bienvenid@ causa 🔥🙌',
+  '✨ ¡Un nuevo crack se une! @NUM, esto se pone bueno con vos aquí 😎🎊',
+  '🥳 ¡Aplausos para @NUM que acaba de entrar! Prepárate pa reírte harto por acá 😂🎈',
+  '💫 @NUM acaba de aparecer... y el grupo ya se siente más completo 🙏🔥',
+  '🎊 ¡Bienvenid@, @NUM! Agarra sitio que aquí la pasamos bien y sin roche 😄👑',
+  '🚀 @NUM se unió a la nave... ¡prepárense que llegó con toda la energía! 🎉😆',
+  '🌟 Nuevo integrante en la casa: @NUM. ¡Que la pases increíble por acá, causa! 🙌🎈'
+];
+function comandoBienvenidaAleatoria(numero) {
+  const base = FRASES_BIENVENIDA[Math.floor(Math.random() * FRASES_BIENVENIDA.length)];
+  return base.replace('@NUM', `@${numero}`);
+}
+
+const SUBREDDITS_MEME_ES = ['memesenespanol', 'chistes', 'humor'];
+async function comandoMeme(sock, jidGrupo) {
+  for (const sub of SUBREDDITS_MEME_ES) {
+    try {
+      const res = await fetch(`https://meme-api.com/gimme/${sub}`);
+      const data = await res.json();
+      if (data?.url && !data.nsfw) {
+        await sock.sendMessage(jidGrupo, { image: { url: data.url }, caption: data.title || '😂' });
+        return;
+      }
+      console.log(`⚠️ Meme sin url válida en r/${sub}:`, JSON.stringify(data).slice(0, 200));
+    } catch (err) {
+      console.log(`⚠️ Meme falló en r/${sub}:`, err.message);
+    }
+  }
+  await sock.sendMessage(jidGrupo, { text: 'No pude traer un meme ahorita 😅' });
+}
+
+async function comandoEncuesta(sock, jidGrupo, textoCompleto) {
+  const partes = textoCompleto.split(';').map(p => p.trim()).filter(Boolean);
+  if (partes.length < 3) {
+    await sock.sendMessage(jidGrupo, { text: 'Formato: /encuesta pregunta; opción1; opción2' });
+    return;
+  }
+  const [pregunta, ...opciones] = partes;
+  try {
+    await sock.sendMessage(jidGrupo, { poll: { name: pregunta, values: opciones, selectableCount: 1 } });
+  } catch (err) {
+    await sock.sendMessage(jidGrupo, { text: 'No pude crear la encuesta, revisa la versión de Baileys.' });
+  }
+}
+
+async function comandoRanking(sock, jidGrupo) {
+  const mapa = contadorMensajesGrupo.get(jidGrupo);
+  if (!mapa || mapa.size === 0) return { texto: 'Aún no hay suficiente actividad para armar un ranking 📊', mentions: [] };
+  const ordenado = [...mapa.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const mentions = ordenado.map(([jid]) => jid);
+  const texto = '🏆 *Ranking de más activos:*\n' + ordenado.map(([jid, n], i) => `${i + 1}. @${jid.split('@')[0]} — ${n} msjs`).join('\n');
+  return { texto, mentions };
+}
+
+async function esAdminGrupo(sock, jidGrupo, jidUsuario) {
+  try {
+    const metadata = await sock.groupMetadata(jidGrupo);
+    const participante = metadata.participants.find(p => p.id === jidUsuario);
+    return !!participante && (participante.admin === 'admin' || participante.admin === 'superadmin');
+  } catch (err) {
+    return false;
+  }
+}
+
+async function comandoPerfil(sock, jidGrupo, jidUsuario, mencionJid) {
+  const jidObjetivo = mencionJid || jidUsuario;
+  const numero = jidObjetivo.split('@')[0];
+  const mapa = contadorMensajesGrupo.get(jidGrupo);
+  const mensajes = mapa?.get(jidObjetivo) || 0;
+  const esAdmin = await esAdminGrupo(sock, jidGrupo, jidObjetivo);
+  const texto = `👤 *Perfil de @${numero}*\n📨 Mensajes en el grupo: ${mensajes}\n👑 Admin: ${esAdmin ? 'Sí' : 'No'}`;
+  await sock.sendMessage(jidGrupo, { text, mentions: [jidObjetivo] });
+}
+async function comandoKick(sock, jidGrupo, jidUsuario, mencionados) {
+  if (!(await esAdminGrupo(sock, jidGrupo, jidUsuario))) {
+    await sock.sendMessage(jidGrupo, { text: 'Solo los admins del grupo pueden usar este comando causa 🚫' });
+    return;
+  }
+  if (!mencionados.length) {
+    await sock.sendMessage(jidGrupo, { text: 'Menciona a quién quieres sacar: /kick @usuario' });
+    return;
+  }
+  try {
+    await sock.groupParticipantsUpdate(jidGrupo, mencionados, 'remove');
+    await sock.sendMessage(jidGrupo, { text: `👋 Listo, saqué a ${mencionados.length} del grupo.` });
+  } catch (err) {
+    await sock.sendMessage(jidGrupo, { text: 'No pude sacarlo, revisa que el bot sea admin del grupo 🙏' });
+  }
+}
+
+async function comandoPromoverDegradar(sock, jidGrupo, jidUsuario, mencionados, accion) {
+  if (!(await esAdminGrupo(sock, jidGrupo, jidUsuario))) {
+    await sock.sendMessage(jidGrupo, { text: 'Solo los admins pueden usar este comando 🚫' });
+    return;
+  }
+  if (!mencionados.length) {
+    await sock.sendMessage(jidGrupo, { text: `Menciona a quién: /${accion === 'promote' ? 'promover' : 'degradar'} @usuario` });
+    return;
+  }
+  try {
+    await sock.groupParticipantsUpdate(jidGrupo, mencionados, accion);
+    await sock.sendMessage(jidGrupo, { text: accion === 'promote' ? '⭐ Listo, ahora es admin.' : '🔻 Listo, ya no es admin.' });
+  } catch (err) {
+    await sock.sendMessage(jidGrupo, { text: 'No pude hacer el cambio, revisa que el bot sea admin del grupo.' });
+  }
+}
+
+async function comandoTodos(sock, jidGrupo, jidUsuario, mensajeExtra) {
+  if (!(await esAdminGrupo(sock, jidGrupo, jidUsuario))) {
+    await sock.sendMessage(jidGrupo, { text: 'Solo los admins pueden usar /todos 🚫' });
+    return;
+  }
+  try {
+    const metadata = await sock.groupMetadata(jidGrupo);
+    const jids = metadata.participants.map(p => p.id);
+    const texto = mensajeExtra ? `📢 ${mensajeExtra}` : '📢 ¡Atención a todos!';
+    const menciones = jids.map(j => `@${j.split('@')[0]}`).join(' ');
+    await sock.sendMessage(jidGrupo, { text: `${texto}\n\n${menciones}`, mentions: jids });
+  } catch (err) {
+    await sock.sendMessage(jidGrupo, { text: 'No pude etiquetar a todos, intenta de nuevo.' });
+  }
+}
+
+async function comandoCerrarGrupo(sock, jidGrupo, jidUsuario, cerrar) {
+  if (!(await esAdminGrupo(sock, jidGrupo, jidUsuario))) {
+    await sock.sendMessage(jidGrupo, { text: 'Solo admins 🚫' });
+    return;
+  }
+  try {
+    await sock.groupSettingUpdate(jidGrupo, cerrar ? 'announcement' : 'not_announcement');
+    await sock.sendMessage(jidGrupo, { text: cerrar ? '🔒 Grupo cerrado, solo admins escriben.' : '🔓 Grupo abierto para todos.' });
+  } catch (err) {
+    await sock.sendMessage(jidGrupo, { text: 'No pude cambiar la configuración, revisa que el bot sea admin.' });
+  }
+}
+
+function generarTextoInfo() {
+  const uptimeH = ((Date.now() - estado.inicio) / 3600000).toFixed(1);
+  return `🤖 *${NOMBRE_BOT}* — v${VERSION_BOT}
+
+👨‍💻 Creado por: *Albert Oficial*, ingeniero de sistemas.
+🟢 Estado: ${estado.conectado ? 'Conectado y activo' : 'Desconectado'}
+⏱ Tiempo activo: ${uptimeH}h
+
+Escribe /comandos para ver todo lo que puedo hacer.`;
+}
+
+const TEXTO_CREADOR = `👑 Este bot fue creado por *Albert Oficial*, desarrollador de bots de WhatsApp y aplicaciones. 🙌`;
+
+const TEXTO_REGLAS = `╔════════════════════════╗
+            🏆 REGLAMENTO OFICIAL
+                          DEL CLAN 🏆
+╚════════════════════════╝
+
+Bienvenido al clan. [STX] OFICIAL
+
+El objetivo de este reglamento es mantener el orden, el respeto y la competitividad entre todos los integrantes. Al permanecer en el clan, cada miembro acepta cumplir las siguientes normas.
+
+━━━━━━━━━━━━━━━━━━━━━━
+🚫 REGLAS NO PERMITIDAS
+━━━━━━━━━━━━━━━━━━━━━━
+
+❌ Enviar contenido gore.
+❌ Enviar contenido pornográfico (+18).
+❌ Insultar o faltar el respeto a cualquier integrante.
+❌ Generar discusiones o conflictos dentro del grupo.
+❌ Enviar stickers fuera de contexto.
+❌ Hacer spam o promocionar otros clanes.
+
+━━━━━━━━━━━━━━━━━━━━━━
+✅ OBLIGACIONES DEL MIEMBRO
+━━━━━━━━━━━━━━━━━━━━━━
+
+✔ Mantener una participación activa dentro del clan.
+✔ Obtener un mínimo de *2,000 placas por semana*.
+✔ Participar en guerras de clanes, torneos y partidas amistosas cuando sea convocado.
+✔ Mantenerse atento a los anuncios y comunicados oficiales.
+✔ Cualquier duda, sugerencia o reclamo deberá dirigirse únicamente a los administradores.
+✔ El cambio de iniciales del clan solo podrá realizarse después de un período mínimo de *3 meses*.
+
+━━━━━━━━━━━━━━━━━━━━━━
+🎁 RECOMPENSAS OFICIALES
+━━━━━━━━━━━━━━━━━━━━━━
+
+💎 *100 Diamantes*
+Para el jugador más destacado de la semana.
+
+🔥 *300 Diamantes*
+Todo miembro que consiga *25,000 placas durante la semana* recibirá una recompensa de *300 diamantes*, previa verificación por parte de los administradores.
+
+🎫 *Pase Élite*
+Se realizará un sorteo de *1 Pase Élite* el día *28 de cada mes*.
+
+⚔ *PVP con premios*
+Cada integrante de la escuadra ganadora recibirá *100 diamantes*.
+
+🏆 *Reconocimiento Semanal*
+El jugador con mayor cantidad de placas será reconocido como el mejor miembro de la semana.
+
+━━━━━━━━━━━━━━━━━━━━━━
+⚠ SISTEMA DE SANCIONES
+━━━━━━━━━━━━━━━━━━━━━━
+
+🟡 Primera falta: Advertencia.
+🟠 Segunda falta: Suspensión temporal de actividades del clan.
+🔴 Tercera falta: Expulsión definitiva del clan, según decisión de la administración.
+
+━━━━━━━━━━━━━━━━━━━━━━
+🏆 COMPROMISO DEL CLAN
+━━━━━━━━━━━━━━━━━━━━━━
+
+Nuestro objetivo es formar un clan competitivo, organizado y respetuoso, donde cada integrante contribuya al crecimiento del equipo mediante su actividad, disciplina y juego limpio.
+
+El incumplimiento de cualquiera de las normas podrá ser sancionado por la administración.
+
+         ⚔ JUEGA LIMPIO • COMPITE CON HONOR • REPRESENTA AL CLAN ⚔`;
+
+const TEXTO_REGLAS_PVP = `⚔ REGLAMENTO OFICIAL DE PVP ⚔
+
+Los PVP del clan están diseñados para demostrar únicamente la habilidad de cada jugador.
+
+🚫 Queda estrictamente prohibido el uso de cualquier tipo de ventaja ilegal, incluyendo:
+• Fake Lag.
+• Hologramas.
+• Aimbot.
+• Cualquier otra ventaja que altere el desarrollo normal de la partida.
+
+━━━━━━━━━━━━━━━━━━━━━━
+🧬 HABILIDADES PERMITIDAS
+━━━━━━━━━━━━━━━━━━━━━━
+
+✅ Alok.
+✅ Kelly.
+✅ Ayato.
+✅ Maxim.
+
+No se permitirá el uso de ninguna otra habilidad.
+
+━━━━━━━━━━━━━━━━━━━━━━
+🔫 ARMAS PERMITIDAS
+━━━━━━━━━━━━━━━━━━━━━━
+
+✔ Desert Eagle.
+✔ M10.
+✔ M1887.
+
+No se permitirá el uso de armas distintas a las mencionadas.
+
+━━━━━━━━━━━━━━━━━━━━━━
+📌 REGLAS DEL COMBATE
+━━━━━━━━━━━━━━━━━━━━━━
+
+• Está prohibido encerrarse durante el enfrentamiento.
+• No está permitido dejar morir al rival por la zona.
+• Cada enfrentamiento deberá realizarse respetando el orden establecido.
+• Los combates serán *1 vs 1*.
+• Ningún integrante podrá intervenir en el duelo de otro compañero.
+• Está estrictamente prohibido que dos o más jugadores ataquen a un solo rival.
+
+El incumplimiento de cualquiera de estas reglas ocasionará que el enfrentamiento sea declarado *NO VÁLIDO*.
+
+La escuadra rival será declarada vencedora automáticamente y avanzará a la siguiente ronda.`;
+
+async function procesarComandoJefe(sock, remitente, texto) {
+  const t = texto.toLowerCase().trim();
+
+  if (t === 'salir' || t.includes('salir del menu') || t.includes('salir del menú') || t.includes('modo normal')) {
+    modoJefe.delete(remitente);
+    await sock.sendMessage(remitente, { text: 'Listo jefe, cerré el menú 🙌' });
+    return;
+  }
+  if (t.includes('informe') || t.includes('estado') || t.includes('estadistica') || t.includes('estadística')) {
+    const uptimeH = ((Date.now() - estado.inicio) / 3600000).toFixed(1);
+    await sock.sendMessage(remitente, {
+      text: `📊 *Informe de ${NOMBRE_BOT}*\nConectado: ${estado.conectado ? 'Sí' : 'No'}\nBot activo: ${botActivo ? 'Sí' : 'No'}\nUptime: ${uptimeH}h\nMensajes recibidos: ${estado.mensajesRecibidos}\nMensajes enviados: ${estado.mensajesEnviados}\nCuota IA hoy: ${contadorCuota.usados}/${LIMITE_DIARIO_ESTIMADO}\nReconexiones: ${estado.intentosReconexion}\nTono actual: ${estiloGlobalExtra || 'el original, sin cambios'}`
+    });
+    return;
+  }
+  if (t.includes('apaga')) {
+    botActivo = false;
+    await sock.sendMessage(remitente, { text: '🔴 Bot apagado en todos los grupos.' });
+    return;
+  }
+  if (t.includes('enciende') || t.includes('activa')) {
+    botActivo = true;
+    await sock.sendMessage(remitente, { text: '🟢 Bot encendido en todos los grupos.' });
+    return;
+  }
+  if (t.includes('restaura') || t.includes('vuelve a la normalidad') || t.includes('como eras antes') || t.includes('forma original')) {
+    estiloGlobalExtra = '';
+    await sock.sendMessage(remitente, { text: '✅ Listo jefe, volví a mi forma de ser original.' });
+    return;
+  }
+
+  estiloGlobalExtra = texto.trim();
+  await sock.sendMessage(remitente, { text: `✅ Listo jefe, actualicé mi forma de expresarme en TODOS los grupos:\n"${estiloGlobalExtra}"\n\n(escribe "restaura" para volver a mi forma original)` });
+}
+async function procesarMensajeGrupo(sock, msg, identificadoresBot) {
+  const jidGrupo = msg.key.remoteJid;
+  const jidUsuario = msg.key.participant || msg.key.remoteJid;
+  const nombreContacto = msg.pushName || 'amig@';
+  const texto = (msg.message.conversation || msg.message.extendedTextMessage?.text || '').trim();
+  if (!texto) return;
+
+  registrarMensajeGrupo(jidGrupo, jidUsuario);
+
+  if (esIntencionCompra(texto)) {
+    try {
+      await sock.sendMessage(jidGrupo, { text: 'Dame un toque que le aviso a Alberto para que te atienda directo 🙌', mentions: [jidUsuario] });
+      await sock.sendMessage(JID_DUEÑO, { text: `💰 Posible cliente en grupo: ${nombreContacto} (${jidUsuario.split('@')[0]}) preguntó: "${texto}"` });
+    } catch (err) { console.log('❌ Error en flujo de compra:', err.message); }
+    return;
+  }
+
+  const mencionados = msg.message.extendedTextMessage?.contextInfo?.mentionedJid || [];
+  const partesTexto = texto.split(/\s+/);
+  const comando = partesTexto[0].toLowerCase();
+  const resto = partesTexto.slice(1);
+  const { tipo } = extraerTipoYMencion(resto, mencionados);
+
+  try {
+    switch (comando) {
+      case '/porciento': {
+        const { texto: t, mentions } = comandoPorciento(tipo, mencionados[0]);
+        await sock.sendMessage(jidGrupo, { text: t, mentions });
+        return;
+      }
+      case '/shipeo': {
+        if (mencionados.length < 2) { await sock.sendMessage(jidGrupo, { text: 'Menciona a dos personas: /shipeo @user1 @user2' }); return; }
+        const { texto: t, mentions } = comandoShipeo(mencionados[0], mencionados[1]);
+        await sock.sendMessage(jidGrupo, { text: t, mentions });
+        return;
+      }
+      case '/matrimonio': {
+        const { texto: t, mentions } = comandoMatrimonio(mencionados);
+        await sock.sendMessage(jidGrupo, { text: t, mentions });
+        return;
+      }
+      case '/dado': await sock.sendMessage(jidGrupo, { text: `🎲 Salió: ${comandoDado()}` }); return;
+      case '/moneda': await sock.sendMessage(jidGrupo, { text: `🪙 ${comandoMoneda()}` }); return;
+      case '/8bola': await sock.sendMessage(jidGrupo, { text: `🔮 ${comando8Bola()}` }); return;
+      case '/frase': await sock.sendMessage(jidGrupo, { text: comandoFrase() }); return;
+      case '/meme': await comandoMeme(sock, jidGrupo); return;
+      case '/encuesta': await comandoEncuesta(sock, jidGrupo, resto.join(' ')); return;
+      case '/perfil': await comandoPerfil(sock, jidGrupo, jidUsuario, mencionados[0]); return;
+      case '/ranking': {
+        const { texto: t, mentions } = await comandoRanking(sock, jidGrupo);
+        await sock.sendMessage(jidGrupo, { text: t, mentions });
+        return;
+      }
+      case '/kick': case '/eliminar': case '/sacar': case '/ban':
+        await comandoKick(sock, jidGrupo, jidUsuario, mencionados); return;
+      case '/promover': await comandoPromoverDegradar(sock, jidGrupo, jidUsuario, mencionados, 'promote'); return;
+      case '/degradar': await comandoPromoverDegradar(sock, jidGrupo, jidUsuario, mencionados, 'demote'); return;
+      case '/todos': case '/everyone': await comandoTodos(sock, jidGrupo, jidUsuario, resto.join(' ')); return;
+      case '/cerrar': await comandoCerrarGrupo(sock, jidGrupo, jidUsuario, true); return;
+      case '/abrir': await comandoCerrarGrupo(sock, jidGrupo, jidUsuario, false); return;
+      case '/recordatorio': {
+        if (!(await esAdminGrupo(sock, jidGrupo, jidUsuario))) { await sock.sendMessage(jidGrupo, { text: 'Solo admins pueden programar recordatorios 🚫' }); return; }
+        const minutos = parseInt(resto[0], 10);
+        const textoRecordatorio = resto.slice(1).join(' ');
+        if (!minutos || !textoRecordatorio) { await sock.sendMessage(jidGrupo, { text: 'Uso: /recordatorio 30 avisar la reunión' }); return; }
+        programarRecordatorioGrupo(jidGrupo, minutos, textoRecordatorio);
+        await sock.sendMessage(jidGrupo, { text: `⏰ Listo, aviso en ${minutos} min: "${textoRecordatorio}"` });
+        return;
+      }
+      case '/info': await sock.sendMessage(jidGrupo, { text: generarTextoInfo() }); return;
+      case '/creador': await sock.sendMessage(jidGrupo, { text: TEXTO_CREADOR }); return;
+      case '/reglas': await sock.sendMessage(jidGrupo, { text: TEXTO_REGLAS }); return;
+      case '/reglaspvp': await sock.sendMessage(jidGrupo, { text: TEXTO_REGLAS_PVP }); return;
+      case '/recordar': {
+        const lista = memoriaPersistente[jidUsuario] || [];
+        if (!lista.length) { await sock.sendMessage(jidGrupo, { text: 'Aún no tengo nada guardado de ti 🤔' }); return; }
+        const resumen = lista.map(m => `👤 ${m.texto}\n🤖 ${m.respuesta}`).join('\n\n');
+        await sock.sendMessage(jidGrupo, { text: `🧠 Esto recuerdo de ti:\n\n${resumen}` });
+        return;
+      }
+      case '/olvidarme': {
+        olvidarUsuario(jidUsuario);
+        await sock.sendMessage(jidGrupo, { text: 'Listo, borré todo lo que recordaba de ti 🗑️' });
+        return;
+      }
+      case '/comandos': case '/ayuda': await sock.sendMessage(jidGrupo, { text: TEXTO_AYUDA }); return;
+    }
+  } catch (err) {
+    console.log('❌ Error en comando:', err.message);
+    return;
+  }
+
+  if (!debeResponderIA(texto, msg, identificadoresBot)) return;
+
+  if (esMensajeDeCrisis(texto)) {
+    try {
+      await sock.sendMessage(JID_DUEÑO, { text: `🚨 Alerta: ${nombreContacto} en grupo escribió algo que parece señal de crisis: "${texto}"` });
+    } catch (err) {}
+  }
+
+  try {
+    const consultaLimpia = texto.replace(/@\d+/g, '').replace(/^\/criss\s*/i, '').trim() || texto;
+    const notas = `Mensaje de ${nombreContacto} dentro de un grupo de WhatsApp, hay más personas leyendo.` + obtenerContextoCorto(jidUsuario);
+    const respuesta = await generarRespuestaIA(consultaLimpia, notas);
+    await enviarRespuestaHumanizada(sock, jidGrupo, respuesta, [jidUsuario]);
+    agregarAMemoriaCorta(jidUsuario, texto, respuesta);
+  } catch (err) {
+    console.log('❌ Error IA:', err.message);
+    await sock.sendMessage(jidGrupo, { text: mensajeEsperaAleatorio() });
+  }
+}
+
+function registrarBienvenidasYDespedidas(sock) {
+  sock.ev.on('group-participants.update', async (evento) => {
+    console.log('📥 Evento de participantes recibido:', evento.action);
+    const { id: jidGrupo, participants, action } = evento;
+    for (const participanteRaw of participants) {
+      const { jid: jidParticipante, numero } = normalizarParticipante(participanteRaw);
+      if (!jidParticipante) { console.log('⚠️ Participante sin jid válido, se omite:', participanteRaw); continue; }
+      try {
+        if (action === 'add') {
+          let fotoUrl = null;
+          try { fotoUrl = await sock.profilePictureUrl(jidParticipante, 'image'); } catch (err) { fotoUrl = null; }
+
+          const texto = comandoBienvenidaAleatoria(numero);
+
+          if (fotoUrl) {
+            await sock.sendMessage(jidGrupo, { image: { url: fotoUrl }, caption: texto, mentions: [jidParticipante] });
+          } else {
+            const fotoGenerada = await generarAvatarIA(numero);
+            if (fotoGenerada) {
+              await sock.sendMessage(jidGrupo, { image: fotoGenerada, caption: texto, mentions: [jidParticipante] });
+            } else {
+              const fotoRespaldo = `https://api.dicebear.com/7.x/adventurer/png?seed=${numero}`;
+              await sock.sendMessage(jidGrupo, { image: { url: fotoRespaldo }, caption: texto, mentions: [jidParticipante] });
+            }
+          }
+        } else if (action === 'remove') {
+          await sock.sendMessage(jidGrupo, { text: comandoDespedidaAleatoria(numero), mentions: [jidParticipante] });
+        } else if (action === 'promote') {
+          await sock.sendMessage(jidGrupo, { text: `⭐ @${numero} ahora es admin del grupo.`, mentions: [jidParticipante] });
+        } else if (action === 'demote') {
+          await sock.sendMessage(jidGrupo, { text: `🔻 @${numero} ya no es admin.`, mentions: [jidParticipante] });
+        }
+      } catch (err) {
+        console.log('⚠️ Error en bienvenida/despedida:', err.message);
+      }
+    }
+  });
+}
+const estado = {
+  conectado: false, inicio: Date.now(), mensajesRecibidos: 0, mensajesEnviados: 0,
+  ultimoQR: null, intentosReconexion: 0, ultimoError: null
+};
 
 function calcularEsperaReconexion(intentos) {
   const base = Math.min(3000 * Math.pow(2, intentos), 60000);
@@ -394,502 +829,166 @@ function calcularEsperaReconexion(intentos) {
 }
 
 const almacenMensajes = new Map();
-async function procesarComandoAdmin(sock, texto) {
-  const partes = texto.trim().split(' ');
-  const comando = partes[0].toLowerCase();
 
-  if (comando === '!stats') {
-    const uptimeH = ((Date.now() - estado.inicio) / 3600000).toFixed(1);
-    await sock.sendMessage(JID_DUEÑO, {
-      text: `📊 *Criss Bot*\nUptime: ${uptimeH}h\nMensajes recibidos: ${estado.mensajesRecibidos}\nMensajes enviados: ${estado.mensajesEnviados}\nUso IA hoy: ${contadorCuota.usados}/${LIMITE_DIARIO_ESTIMADO}\nReconexiones: ${estado.intentosReconexion}`
-    });
-    return true;
-  }
-  if (comando === '!ff') {
-    await sock.sendMessage(JID_DUEÑO, {
-      text: `🎮 Catálogo Free Fire:\n- Hologramas\n- Aimbot\n- Regedit\n- Archivos data\n- Paneles PC/Android`
-    });
-    return true;
-  }
-  if (comando === '!nota') {
-    const numero = partes[1];
-    const notaTexto = partes.slice(2).join(' ');
-    if (!numero || !notaTexto) {
-      await sock.sendMessage(JID_DUEÑO, { text: 'Uso: !nota 519XXXXXXXX texto de la nota' });
-      return true;
-    }
-    agregarNota(`${numero}@s.whatsapp.net`, notaTexto);
-    await sock.sendMessage(JID_DUEÑO, { text: `✅ Nota agregada para ${numero}` });
-    return true;
-  }
-  if (comando === '!recuerdame') {
-    const minutos = parseInt(partes[1], 10);
-    const notaTexto = partes.slice(2).join(' ');
-    if (!minutos || !notaTexto) {
-      await sock.sendMessage(JID_DUEÑO, { text: 'Uso: !recuerdame 120 enviar el archivo a fulano' });
-      return true;
-    }
-    programarRecordatorio(minutos, notaTexto);
-    await sock.sendMessage(JID_DUEÑO, { text: `⏰ Te recuerdo en ${minutos} min: "${notaTexto}"` });
-    return true;
-  }
-  return false;
-}
-
-async function generarInformeNatural() {
-  const uptimeH = ((Date.now() - estado.inicio) / 3600000).toFixed(1);
-  const datosCrudos = {
-    activo: botActivo,
-    uptimeHoras: uptimeH,
-    recibidos: estado.mensajesRecibidos,
-    respondidos: estado.mensajesEnviados,
-    cuotaUsada: contadorCuota.usados,
-    cuotaLimite: LIMITE_DIARIO_ESTIMADO,
-    modelo: MODELO_PRINCIPAL,
-    reconexiones: estado.intentosReconexion,
-    ultimaFalla: estado.ultimoError || 'ninguna registrada'
-  };
-
-  const instruccion = `Eres ${NOMBRE_BOT} hablándole a ${CREADOR}, tu creador, en modo asistente ejecutivo formal pero cercano. Te doy datos técnicos crudos en JSON. Redacta un informe CONVERSACIONAL, natural, en 6-8 líneas, explicando cómo está funcionando todo. Si hay una falla reciente, explícala en términos simples y aclara si parece grave o normal/resuelto. No uses formato de plantilla ni etiquetas, habla como si se lo contaras de palabra.
-
-Datos: ${JSON.stringify(datosCrudos)}`;
-
-  try {
-    return await consultaIAsimple(instruccion, 'Dame el informe.');
-  } catch (err) {
-    return 'Tuve un problema generando el informe justo ahora, jefe. Intente de nuevo en un momento.';
-  }
-}
-
-async function clasificarComandoJefe(texto) {
-  const instruccion = `Eres un clasificador. El usuario es el DUEÑO de un bot de WhatsApp dándote una instrucción en lenguaje natural. Clasifica su mensaje en UNA de estas categorías exactas, respondiendo SOLO el nombre de la categoría:
-
-INFORME - pide un reporte, informe, estado, estadísticas, errores o cómo está funcionando el bot
-APAGAR - pide apagar, silenciar o desactivar el bot
-ENCENDER - pide encender, activar o reactivar el bot
-CAMBIAR_TONO - pide cambiar la forma de hablar, extensión de respuesta, o estilo del bot para todos los chats
-RESTAURAR_TONO - pide que el bot VUELVA a su forma de ser original/normal/de antes, deshaciendo cualquier cambio previo
-HISTORIAL - pide ver mensajes anteriores, historial o conversación de algún chat/contacto/tema, o los últimos mensajes en general
-PERMITIR_CHISTES_CREADOR - pide que el bot pueda hacer chistes sobre su creador
-PROHIBIR_CHISTES_CREADOR - pide que el bot deje de hacer chistes sobre su creador
-SALIR - pide salir del modo jefe, volver al modo normal
-OTRO - cualquier otra cosa
-
-Mensaje del dueño: "${texto}"
-
-Responde solo con la categoría, nada más.`;
-
-  try {
-    const resultado = await consultaIAsimple(instruccion, texto);
-    return resultado.trim().toUpperCase();
-  } catch (err) {
-    return 'OTRO';
-  }
-}
-
-async function buscarHistorialRelevante(consultaTexto) {
-  const numeroMatch = consultaTexto.match(/\d{9,}/);
-  if (numeroMatch) {
-    const jid = `${numeroMatch[0]}@s.whatsapp.net`;
-    if (historialChats.has(jid)) return { jid, nombre: nombresConocidos.get(jid) || numeroMatch[0] };
-  }
-
-  const instruccion = `El usuario quiere buscar en un historial de chats. Si menciona un TEMA o PALABRA CLAVE específica, respóndela tal cual, corta. Si NO menciona ningún tema específico y solo pide "los últimos mensajes" en general, responde exactamente: GENERAL`;
-  let resultado = '';
-  try {
-    resultado = (await consultaIAsimple(instruccion, consultaTexto)).trim();
-  } catch (err) {
-    return null;
-  }
-
-  if (resultado.toUpperCase() === 'GENERAL') return { general: true };
-
-  const palabraClave = resultado.toLowerCase();
-  for (const [jid, lista] of historialChats.entries()) {
-    const textoCompleto = lista.map(m => m.texto + ' ' + m.respuesta).join(' ').toLowerCase();
-    if (textoCompleto.includes(palabraClave)) {
-      return { jid, nombre: nombresConocidos.get(jid) || jid.split('@')[0] };
-    }
-  }
-  return { general: true };
-}
-
-function extraerCantidadSolicitada(texto) {
-  const match = texto.match(/\b(\d{1,2})\b/);
-  const n = match ? parseInt(match[1], 10) : 4;
-  return Math.min(Math.max(n, 1), 15);
-}
-
-async function procesarComandoJefe(sock, remitenteJefe, texto) {
-  if (detectarSalidaModoJefe(texto)) {
-    modoJefe.delete(remitenteJefe);
-    await sock.sendMessage(remitenteJefe, { text: 'Listo jefe, salí del modo administrador. Vuelvo a mi modo normal en este chat 🙌' });
-    return;
-  }
-
-  const categoria = await clasificarComandoJefe(texto);
-
-  if (categoria === 'SALIR') {
-    modoJefe.delete(remitenteJefe);
-    await sock.sendMessage(remitenteJefe, { text: 'Listo jefe, salí del modo administrador. Vuelvo a mi modo normal en este chat 🙌' });
-    return;
-  }
-  if (categoria === 'INFORME') {
-    await sock.sendMessage(remitenteJefe, { text: await generarInformeNatural() });
-    return;
-  }
-  if (categoria === 'APAGAR') {
-    botActivo = false;
-    await sock.sendMessage(remitenteJefe, { text: '🔴 Bot apagado. Ya no responderé a ningún chat hasta que lo reactive, jefe.' });
-    return;
-  }
-  if (categoria === 'ENCENDER') {
-    botActivo = true;
-    await sock.sendMessage(remitenteJefe, { text: '🟢 Bot reactivado. Volviendo a responder con normalidad.' });
-    return;
-  }
-  if (categoria === 'CAMBIAR_TONO') {
-    const instruccion = `Convierte la instrucción del usuario en una directiva corta y clara para un asistente de IA, en máximo 2 líneas. Si el usuario menciona una cantidad de líneas específica, respétala tal cual la dice.`;
-    let nuevaDirectiva = '';
-    try { nuevaDirectiva = (await consultaIAsimple(instruccion, texto)).trim(); } catch (err) { nuevaDirectiva = ''; }
-    estiloGlobalExtra = nuevaDirectiva;
-    await sock.sendMessage(remitenteJefe, { text: `✅ Tono actualizado para TODOS los chats:\n"${nuevaDirectiva}"` });
-    return;
-  }
-  if (categoria === 'RESTAURAR_TONO') {
-    estiloGlobalExtra = '';
-    await sock.sendMessage(remitenteJefe, { text: '✅ Listo jefe, el bot volvió a su forma de ser original en todos los chats.' });
-    return;
-  }
-  if (categoria === 'PERMITIR_CHISTES_CREADOR') {
-    chistesSobreCreadorPermitidos = true;
-    await sock.sendMessage(remitenteJefe, { text: '😏 Listo jefe, ahora sí puedo hacer chistes ligeros sobre usted cuando venga al caso.' });
-    return;
-  }
-  if (categoria === 'PROHIBIR_CHISTES_CREADOR') {
-    chistesSobreCreadorPermitidos = false;
-    await sock.sendMessage(remitenteJefe, { text: '🙏 Entendido jefe, vuelvo a hablar de usted siempre con respeto, sin chistes.' });
-    return;
-  }
-  if (categoria === 'HISTORIAL') {
-    const cantidad = extraerCantidadSolicitada(texto);
-    const encontrado = await buscarHistorialRelevante(texto);
-
-    if (encontrado && !encontrado.general) {
-      const lista = historialChats.get(encontrado.jid) || [];
-      const ultimos = lista.slice(-cantidad);
-      if (ultimos.length === 0) {
-        await sock.sendMessage(remitenteJefe, { text: `No hay historial guardado para ${encontrado.nombre}.` });
-        return;
-      }
-      const resumen = ultimos.map(m => `👤 ${m.texto}\n🤖 ${m.respuesta}`).join('\n\n');
-      await sock.sendMessage(remitenteJefe, { text: `📜 Últimos mensajes con *${encontrado.nombre}*:\n\n${resumen}` });
-      return;
-    }
-
-    const ultimosGlobales = historialGlobal.slice(-cantidad);
-    if (ultimosGlobales.length === 0) {
-      await sock.sendMessage(remitenteJefe, { text: 'Aún no hay mensajes registrados en el historial, jefe.' });
-      return;
-    }
-    const resumen = ultimosGlobales.map(m => `👤 *${m.nombre}*: ${m.texto}\n🤖 ${m.respuesta}`).join('\n\n');
-    await sock.sendMessage(remitenteJefe, { text: `📜 Últimos ${ultimosGlobales.length} mensajes recibidos por el bot:\n\n${resumen}` });
-    return;
-  }
-
-  const reglasJefe = `Le hablas directamente a ${CREADOR}, tu creador, en modo formal de asistente ejecutivo — como trabajador de confianza hablándole a su patrón. Respetuoso, directo, profesional pero cercano. Sin groserías, sin choreo. Responde en 4-6 líneas.`;
-  try {
-    const res = await aiPrincipal.models.generateContent({
-      model: MODELO_PRINCIPAL,
-      contents: texto,
-      config: { systemInstruction: reglasJefe, safetySettings: SAFETY_SETTINGS, maxOutputTokens: MAX_TOKENS_RESPUESTA }
-    });
-    registrarUsoIA();
-    await sock.sendMessage(remitenteJefe, { text: res.text });
-  } catch (err) {
-    await sock.sendMessage(remitenteJefe, { text: 'Tuve un problema procesando eso, jefe. Intente de nuevo.' });
-  }
-}
-async function procesarMensajeUsuario(sock, remitente, texto, nombreContacto) {
-  if (esIntencionCompra(texto)) {
-    try {
-      await sock.sendMessage(remitente, { text: 'Dame un toque que le aviso a Alberto para que te atienda directo 🙌' });
-      await sock.sendMessage(JID_DUEÑO, {
-        text: `💰 Posible cliente: ${nombreContacto} (${remitente.split('@')[0]}) preguntó: "${texto}"`
-      });
-      estado.mensajesEnviados++;
-    } catch (err) {
-      console.log('❌ Error en flujo de compra:', err.message);
-    }
-    return;
-  }
-
-  try {
-    if (esMensajeDeCrisis(texto)) {
-      try {
-        await sock.sendMessage(JID_DUEÑO, {
-          text: `🚨 Alerta: ${nombreContacto} (${remitente}) escribió algo que parece señal de crisis. Mensaje: "${texto}". Por favor contáctalo directamente.`
-        });
-      } catch (errAlerta) {
-        console.log('❌ No se pudo enviar la alerta:', errAlerta.message);
-      }
-    }
-
-    const nuevoTono = detectarCambioTono(texto);
-    if (nuevoTono) {
-      tonoPersonal.set(remitente, nuevoTono);
-      await enviarRespuestaHumanizada(sock, remitente, mensajeConfirmacionTono(nuevoTono));
-      estado.mensajesEnviados++;
-      return;
-    }
-
-    const primeraVezIA = !yaMencionoNombre.has(remitente);
-    if (primeraVezIA) yaMencionoNombre.add(remitente);
-
-    const nombreAUsar = obtenerNombreAUsar(remitente, nombreContacto);
-
-    let notas = '';
-    if (esAmigoEspecial(nombreContacto)) {
-      notas += `Esta persona (${nombreAUsar}) es pana cercano de confianza de ${CREADOR} — trátalo con cariño extra. `;
-    }
-    const notasGuardadas = obtenerNotas(remitente);
-    if (notasGuardadas.length) {
-      notas += `Datos guardados sobre esta persona: ${notasGuardadas.join('; ')}. `;
-    }
-    const horasSinDueño = (Date.now() - ultimaActividadDueño) / 3600000;
-    if (horasSinDueño > 6) {
-      notas += `Alberto lleva varias horas sin conectarse — si viene al caso puedes mencionarlo casualmente. `;
-    }
-
-    const nivelTono = tonoPersonal.get(remitente) || 'grosero';
-    notas += INSTRUCCIONES_TONO[nivelTono];
-    notas += obtenerContextoCorto(remitente);
-
-    const encabezado = primeraVezIA
-      ? `Consulta de ${nombreAUsar} (usa este nombre/apodo si vas a mencionarlo). Puede venir en varias líneas si mandó varios mensajitos seguidos — interprétalo como una sola idea completa.`
-      : `Consulta (si mencionas a la persona, usa "${nombreAUsar}", NO el nombre de WhatsApp). Puede venir en varias líneas si mandó varios mensajitos seguidos — interprétalo como una sola idea completa.`;
-
-    const respuestaTexto = await generarRespuestaIA(`${encabezado} Mensaje: ${texto}`, notas || null);
-    await enviarRespuestaHumanizada(sock, remitente, respuestaTexto);
-    agregarAMemoriaCorta(remitente, texto, respuestaTexto);
-    guardarEnHistorial(remitente, nombreAUsar, texto, respuestaTexto);
-    estado.mensajesEnviados++;
-    console.log(`✅ Respondí a: ${nombreAUsar} (${remitente})`);
-  } catch (err) {
-    console.log('❌ Error IA:', err.message);
-    await sock.sendMessage(remitente, { text: mensajeEsperaAleatorio() });
-  }
-}
 async function iniciarBot() {
   const { state, saveCreds } = await useMultiFileAuthState('sesion');
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
-    auth: state,
-    version,
-    printQRInTerminal: false,
-    browser: [NOMBRE_BOT, 'Chrome', '2.0.0'],
-    syncFullHistory: false,
-    markOnlineOnConnect: true,
+    auth: state, version, printQRInTerminal: false,
+    browser: [NOMBRE_BOT, 'Chrome', '2.0.0'], syncFullHistory: false, markOnlineOnConnect: true,
     getMessage: async (key) => almacenMensajes.get(key.id) || undefined
   });
 
   sockActivo = sock;
   sock.ev.on('creds.update', saveCreds);
+  registrarBienvenidasYDespedidas(sock);
 
   sock.ev.on('connection.update', async (update) => {
     const { connection, qr, lastDisconnect } = update;
-
     if (qr) {
       estado.ultimoQR = await QRCode.toDataURL(qr);
-      console.log('\n📲 ESCANEA ESTE QR (o entra al panel web /qr):');
       qrcodeTerminal.generate(qr, { small: true });
     }
-
     if (connection === 'open') {
-      estado.conectado = true;
-      estado.intentosReconexion = 0;
-      estado.ultimoQR = null;
-      console.log('\n✅ ✅ BOT CONECTADO Y LISTO ✅ ✅');
+      estado.conectado = true; estado.intentosReconexion = 0; estado.ultimoQR = null;
+      console.log('\n✅ BOT CONECTADO Y LISTO ✅');
+      console.log('🆔 Identificadores del bot detectados:', obtenerIdentificadoresBot(sock));
     }
-
     if (connection === 'close') {
       estado.conectado = false;
       const motivo = lastDisconnect?.error?.output?.statusCode;
       estado.ultimoError = lastDisconnect?.error?.message || 'Desconocido';
-      console.log(`\n⚠️ Desconectado (código ${motivo || 'desconocido'}): ${estado.ultimoError}`);
-
-      if (motivo === DisconnectReason.loggedOut) {
-        console.log('❌ Sesión cerrada por WhatsApp. Borra la carpeta "sesion" y vuelve a escanear.');
-        return;
-      }
-      if (motivo === DisconnectReason.badSession) {
-        console.log('❌ Sesión corrupta. Borra la carpeta "sesion" y reinicia.');
+      if (motivo === DisconnectReason.loggedOut || motivo === DisconnectReason.badSession) {
+        console.log('❌ Sesión inválida. Borra la carpeta "sesion" y vuelve a escanear.');
         return;
       }
       if (motivo === DisconnectReason.restartRequired) {
-        console.log('🔄 WhatsApp pidió reinicio de stream (515), reconectando de inmediato...');
         setTimeout(() => iniciarBot(), 1500);
         return;
       }
-
       estado.intentosReconexion++;
-      const espera = calcularEsperaReconexion(estado.intentosReconexion);
-      console.log(`🔄 Reintentando en ${espera / 1000}s (intento #${estado.intentosReconexion})...`);
-      setTimeout(() => iniciarBot(), espera);
+      setTimeout(() => iniciarBot(), calcularEsperaReconexion(estado.intentosReconexion));
     }
   });
 
   sock.ev.on('messages.upsert', async m => {
     if (m.type !== 'notify') return;
-
     const msg = m.messages[0];
     if (!msg.message) return;
 
     const remitente = msg.key.remoteJid;
 
-    if (msg.key.fromMe) {
-      ultimaActividadDueño = Date.now();
-      const textoPropio = (msg.message.conversation || msg.message.extendedTextMessage?.text || '').trim().toLowerCase();
-
-      if (textoPropio === '/apagado') {
-        botActivo = false;
-        await sock.sendMessage(remitente, { text: '🔴 Bot apagado en TODOS los chats.' });
-        return;
-      }
-      if (textoPropio === '/encendido') {
-        botActivo = true;
-        await sock.sendMessage(remitente, { text: '🟢 Bot encendido, respondiendo normal en todos los chats otra vez.' });
-        return;
-      }
-      if (remitente === JID_DUEÑO && textoPropio.startsWith('!')) {
-        const fueComando = await procesarComandoAdmin(sock, textoPropio);
-        if (fueComando) return;
-      }
-
-      pausaHasta.set(remitente, Date.now() + DURACION_PAUSA_MS);
-      return;
-    }
+    if (msg.key.fromMe) return;
 
     almacenMensajes.set(msg.key.id, msg.message);
-    if (!esChatPersonal(remitente)) return;
 
-    const textoEntrante = msg.message.conversation || msg.message.extendedTextMessage?.text || '';
-
-    if (esContraseñaDueño(textoEntrante)) {
-      modoJefe.set(remitente, true);
-      const bienvenida = await generarBienvenidaJefe();
-      await sock.sendMessage(remitente, { text: bienvenida });
-      return;
-    }
-
-    if (modoJefe.get(remitente)) {
-      await procesarComandoJefe(sock, remitente, textoEntrante);
+    if (!remitente.endsWith('@g.us')) {
+      if (remitente.endsWith('@s.whatsapp.net')) {
+        const textoPersonal = (msg.message.conversation || msg.message.extendedTextMessage?.text || '').trim();
+        if (esCodigoDueño(textoPersonal)) {
+          modoJefe.set(remitente, true);
+          await sock.sendMessage(remitente, {
+            text: `🔐 Menú principal activado, jefe.\n\nPuedes pedirme:\n• informe — estadísticas del bot\n• apagar / encender — activa o desactiva el bot en los grupos\n• restaura — vuelvo a mi forma de ser original\n• cualquier otra frase — la tomo como tu nueva forma de expresarme en TODOS los grupos (ej: "habla más formal", "sé más chistoso")\n• salir — cierra este menú`
+          });
+          return;
+        }
+        if (modoJefe.get(remitente)) {
+          await procesarComandoJefe(sock, remitente, textoPersonal);
+          return;
+        }
+      }
       return;
     }
 
     if (!botActivo) return;
 
-    const pausadoHasta = pausaHasta.get(remitente);
-    if (pausadoHasta && Date.now() < pausadoHasta) return;
-
     const tipoMensaje = Object.keys(msg.message)[0];
     const esSoloMedia = ['imageMessage', 'audioMessage', 'videoMessage', 'stickerMessage'].includes(tipoMensaje)
       && !(msg.message.conversation || msg.message.extendedTextMessage?.text);
-    if (esSoloMedia) {
-      try {
-        await sock.sendMessage(remitente, { react: { text: '👀', key: msg.key } });
-        await sock.sendMessage(remitente, { text: 'Uy causa, a fotos/audios aún no les entro a full, mándame texto mejor 😅' });
-      } catch (err) {
-        console.log('⚠️ Error reaccionando a media:', err.message);
-      }
-      return;
-    }
+    if (esSoloMedia) return;
 
     estado.mensajesRecibidos++;
-    const texto = textoEntrante;
-    const nombreContacto = msg.pushName || 'amig@';
-
-    if (!yaSaludados.has(remitente)) {
-      yaSaludados.add(remitente);
-      yaMencionoNombre.add(remitente);
-      const introSaludo = `👋 ¡Qué fue, causa! Soy Criss IA, el asistente inteligente de Alberto.\n\nEstoy aquí para ayudarte, conversar y meterle un poco de vida al chat. Si vienes con buena onda, todo chévere... pero si vienes a hacer hora, también sé responder. 😏🔥\n\n> Att Alberto`;
-      const preguntaApodo = `Oye, por cierto: ¿te digo *${nombreContacto}* o prefieres que te diga de otra forma? Mándame el nombre o apodo que quieras, o dime "así está bien" 🙌`;
-      try {
-        await sock.sendMessage(remitente, { text: introSaludo });
-        await new Promise(r => setTimeout(r, 1800));
-        await sock.sendMessage(remitente, { text: preguntaApodo });
-        estado.mensajesEnviados += 2;
-        esperandoApodo.add(remitente);
-      } catch (err) {
-        console.log('❌ Error enviando saludo:', err.message);
-      }
-      return;
+    try {
+      const identificadoresBot = obtenerIdentificadoresBot(sock);
+      await procesarMensajeGrupo(sock, msg, identificadoresBot);
+      estado.mensajesEnviados++;
+    } catch (err) {
+      console.log('❌ Error procesando mensaje de grupo:', err.message);
     }
-
-    if (esperandoApodo.has(remitente)) {
-      esperandoApodo.delete(remitente);
-      const nombreValidado = await validarNombrePropuesto(texto);
-
-      let confirmacion;
-      if (!nombreValidado) {
-        confirmacion = `Ya, te sigo diciendo ${nombreContacto} entonces 🙌 ¿En qué te ayudo?`;
-      } else {
-        apodos.set(remitente, nombreValidado);
-        confirmacion = `De una, ${nombreValidado} 😎 ¿En qué te ayudo?`;
-      }
-      try {
-        await enviarRespuestaHumanizada(sock, remitente, confirmacion);
-        estado.mensajesEnviados++;
-      } catch (err) {
-        console.log('❌ Error confirmando apodo:', err.message);
-      }
-      return;
-    }
-
-    bufferizarMensaje(sock, remitente, texto, nombreContacto);
   });
 }
 
 setInterval(async () => {
-  if (!sockActivo || recordatoriosPendientes.length === 0) return;
+  if (!sockActivo || recordatoriosGrupo.length === 0) return;
   const ahora = Date.now();
-  for (let i = recordatoriosPendientes.length - 1; i >= 0; i--) {
-    if (recordatoriosPendientes[i].tiempoEjecucion <= ahora) {
-      const r = recordatoriosPendientes[i];
-      try {
-        await sockActivo.sendMessage(JID_DUEÑO, { text: `⏰ Recordatorio: ${r.texto}` });
-      } catch (err) {
-        console.log('⚠️ Error enviando recordatorio:', err.message);
-      }
-      recordatoriosPendientes.splice(i, 1);
+  for (let i = recordatoriosGrupo.length - 1; i >= 0; i--) {
+    if (recordatoriosGrupo[i].tiempoEjecucion <= ahora) {
+      const r = recordatoriosGrupo[i];
+      try { await sockActivo.sendMessage(r.jidGrupo, { text: `⏰ Recordatorio: ${r.texto}` }); } catch (err) {}
+      recordatoriosGrupo.splice(i, 1);
     }
   }
 }, 30 * 1000);
-const app = express();
+const LISTA_COMANDOS_PANEL = [
+  { cat: '🎉 Diversión', items: [
+    ['/porciento &lt;algo&gt; @user', 'Le saca un % random'],
+    ['/shipeo @user1 @user2', 'Compatibilidad random'],
+    ['/matrimonio @user1 @user2', 'Certificado de boda grupal'],
+    ['/dado', 'Tira un dado'],
+    ['/moneda', 'Cara o sello'],
+    ['/8bola &lt;pregunta&gt;', 'Bola 8 mágica'],
+    ['/frase', 'Frase random'],
+    ['/meme', 'Meme en español'],
+    ['/perfil @user', 'Actividad en el grupo']
+  ]},
+  { cat: '👑 Admin', items: [
+    ['/kick @user', 'Saca del grupo'],
+    ['/promover @user', 'Lo hace admin'],
+    ['/degradar @user', 'Le quita admin'],
+    ['/todos &lt;msj&gt;', 'Etiqueta a todos'],
+    ['/cerrar · /abrir', 'Controla quién escribe'],
+    ['/encuesta preg; op1; op2', 'Encuesta nativa'],
+    ['/recordatorio &lt;min&gt; &lt;texto&gt;', 'Aviso al grupo'],
+    ['/ranking', 'Top de más activos']
+  ]},
+  { cat: '📋 Info', items: [
+    ['/info', 'Info del bot'],
+    ['/creador', 'Quién lo hizo'],
+    ['/reglas', 'Reglamento del clan'],
+    ['/reglaspvp', 'Reglas de PvP']
+  ]},
+  { cat: '🧠 IA', items: [
+    ['/criss &lt;pregunta&gt;', 'Pregúntale a la IA'],
+    ['@bot &lt;pregunta&gt;', 'Mencionando al bot'],
+    ['/recordar', 'Ver qué recuerda de ti'],
+    ['/olvidarme', 'Borra su memoria de ti']
+  ]}
+];
 
-function obtenerInfraestructura() {
-  const mem = process.memoryUsage();
-  return {
-    nodeVersion: process.version,
-    plataforma: `${os.platform()} ${os.arch()}`,
-    ramUsadaMB: Math.round(mem.rss / 1024 / 1024),
-    cargaPromedio: os.loadavg()[0].toFixed(2)
-  };
+function generarHtmlComandos() {
+  return LISTA_COMANDOS_PANEL.map(grupo => `
+    <div class="cat-titulo">${grupo.cat}</div>
+    <div class="cmd-grid">
+      ${grupo.items.map(([nombre, desc]) => `
+        <div class="cmd-card">
+          <div class="cmd-nombre">${nombre}</div>
+          <div class="cmd-desc">${desc}</div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
 }
+
+const app = express();
 
 app.get('/status', (req, res) => {
   res.json({
-    conectado: estado.conectado,
-    botActivo,
+    conectado: estado.conectado, botActivo,
     uptimeSegundos: Math.floor((Date.now() - estado.inicio) / 1000),
-    mensajesRecibidos: estado.mensajesRecibidos,
-    mensajesEnviados: estado.mensajesEnviados,
+    mensajesRecibidos: estado.mensajesRecibidos, mensajesEnviados: estado.mensajesEnviados,
     intentosReconexion: estado.intentosReconexion,
-    ultimoError: estado.ultimoError,
-    cuotaUsada: contadorCuota.usados,
-    cuotaLimite: LIMITE_DIARIO_ESTIMADO,
-    infraestructura: obtenerInfraestructura()
+    cuotaUsada: contadorCuota.usados, cuotaLimite: LIMITE_DIARIO_ESTIMADO
   });
 });
 
@@ -898,33 +997,75 @@ app.get('/', (req, res) => {
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>CRISS AI · Panel</title>
+<title>${NOMBRE_BOT} · Panel</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Mono&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: linear-gradient(160deg, #1c1c1e 0%, #3a3a3d 40%, #0d0d0e 100%); color: #e8e8ec; font-family: 'Segoe UI', Arial, sans-serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; }
-  h1 { font-size: 40px; letter-spacing: 6px; font-weight: 800; background: linear-gradient(120deg, #cfd4da 0%, #ffffff 25%, #8a8f98 50%, #ffffff 75%, #cfd4da 100%); -webkit-background-clip: text; background-clip: text; color: transparent; margin-bottom: 4px; }
-  .sub { color: #9a9ea6; font-size: 13px; margin-bottom: 30px; letter-spacing: 1px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; width: 100%; max-width: 760px; }
-  .card { background: linear-gradient(145deg, #2b2b2e, #1a1a1c); border: 1px solid rgba(200,205,212,0.2); border-radius: 10px; padding: 18px; text-align: center; }
-  .card .valor { font-size: 24px; color: #e8e8ec; font-weight: bold; }
-  .card .etiqueta { font-size: 11px; color: #9a9ea6; margin-top: 6px; text-transform: uppercase; letter-spacing: 1px; }
-  .seccion-titulo { margin-top: 34px; margin-bottom: 14px; font-size: 14px; letter-spacing: 2px; color: #b8bcc4; text-transform: uppercase; }
-  .estado-badge { display: inline-block; margin-top: 20px; padding: 8px 20px; border-radius: 20px; font-weight: bold; font-size: 13px; }
-  .online { background: #1f3b2f; color: #7dffb0; border: 1px solid #7dffb0; }
-  .offline { background: #3b1f1f; color: #ff8c8c; border: 1px solid #ff8c8c; }
-  .barra-fondo { width: 100%; max-width: 760px; height: 14px; background: #2b2b2e; border-radius: 8px; margin-top: 10px; overflow: hidden; }
-  .barra-relleno { height: 100%; background: linear-gradient(90deg, #7dffb0, #ffd27d); }
-  #qr { margin-top: 25px; }
-  #qr img { border-radius: 10px; border: 2px solid rgba(255,255,255,0.25); }
+  body {
+    background: radial-gradient(circle at 20% 0%, #10041f 0%, #000000 55%, #000000 100%);
+    color: #d7e6ff; font-family: 'Space Mono', monospace; min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; padding: 50px 20px 70px;
+    overflow-x: hidden;
+  }
+  h1 {
+    font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 42px; letter-spacing: 8px;
+    background: linear-gradient(90deg, #00f7ff, #a24bff, #ff2ee6, #00f7ff);
+    background-size: 300% auto; -webkit-background-clip: text; background-clip: text; color: transparent;
+    animation: brillo 6s linear infinite; text-align: center;
+  }
+  @keyframes brillo { to { background-position: 300% center; } }
+  .sub { color: #7d8bb5; font-size: 12px; letter-spacing: 3px; margin: 6px 0 34px; text-transform: uppercase; }
+  .badge {
+    padding: 10px 26px; border-radius: 30px; font-family: 'Orbitron', sans-serif; font-weight: 700;
+    font-size: 13px; letter-spacing: 2px; display: flex; align-items: center; gap: 10px; margin-bottom: 34px;
+  }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .online { background: rgba(0,255,170,0.08); border: 1px solid #00ffaa; color: #00ffaa; }
+  .online .dot { background: #00ffaa; box-shadow: 0 0 10px #00ffaa; animation: pulso 1.4s infinite; }
+  .offline { background: rgba(255,60,90,0.08); border: 1px solid #ff3c5a; color: #ff3c5a; }
+  .offline .dot { background: #ff3c5a; box-shadow: 0 0 10px #ff3c5a; }
+  @keyframes pulso { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; width: 100%; max-width: 900px; }
+  .card {
+    background: linear-gradient(160deg, rgba(20,10,40,0.8), rgba(5,5,15,0.9));
+    border: 1px solid rgba(160,90,255,0.25); border-radius: 14px; padding: 20px; text-align: center;
+    box-shadow: 0 0 20px rgba(120,60,255,0.06); transition: transform .2s, box-shadow .2s;
+  }
+  .card:hover { transform: translateY(-3px); box-shadow: 0 0 24px rgba(160,80,255,0.25); }
+  .card .valor { font-family: 'Orbitron', sans-serif; font-size: 26px; color: #f2f6ff; font-weight: 700; }
+  .card .etiqueta { font-size: 10px; color: #8a97c2; margin-top: 8px; text-transform: uppercase; letter-spacing: 1.5px; }
+
+  .seccion { margin-top: 40px; margin-bottom: 14px; font-family: 'Orbitron', sans-serif; font-size: 13px;
+    letter-spacing: 3px; color: #a86bff; text-transform: uppercase; align-self: flex-start;
+    max-width: 900px; width: 100%; }
+
+  .barra-fondo { width: 100%; max-width: 900px; height: 16px; background: rgba(255,255,255,0.05);
+    border-radius: 10px; overflow: hidden; border: 1px solid rgba(160,90,255,0.2); }
+  .barra-relleno { height: 100%; background: linear-gradient(90deg, #00f7ff, #a24bff); box-shadow: 0 0 10px #a24bff; }
+
+  .cat-titulo { font-family: 'Orbitron', sans-serif; font-size: 14px; letter-spacing: 2px; color: #ff2ee6;
+    margin: 26px 0 12px; text-transform: uppercase; width: 100%; max-width: 900px; }
+  .cmd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;
+    width: 100%; max-width: 900px; }
+  .cmd-card { background: rgba(15,8,30,0.7); border: 1px solid rgba(0,247,255,0.2); border-radius: 10px;
+    padding: 12px 16px; transition: border-color .2s, box-shadow .2s; }
+  .cmd-card:hover { border-color: #00f7ff; box-shadow: 0 0 14px rgba(0,247,255,0.25); }
+  .cmd-nombre { font-family: 'Orbitron', sans-serif; font-size: 12px; color: #00f7ff; letter-spacing: 1px; }
+  .cmd-desc { font-size: 11px; color: #9aa4c9; margin-top: 4px; }
+
+  #qr { margin-top: 30px; }
+  #qr img { border-radius: 14px; border: 2px solid rgba(160,90,255,0.4); box-shadow: 0 0 30px rgba(160,90,255,0.3); }
 </style>
 </head>
 <body>
-  <h1>CRISS AI</h1>
+  <h1>${NOMBRE_BOT.toUpperCase()}</h1>
   <div class="sub">Panel de control · ${CREADOR}</div>
-  <div id="badge" class="estado-badge offline">Cargando...</div>
+  <div id="badge" class="badge offline"><div class="dot"></div>Cargando...</div>
 
-  <div class="seccion-titulo">Actividad</div>
+  <div class="seccion">Actividad</div>
   <div class="grid">
     <div class="card"><div class="valor" id="msgIn">0</div><div class="etiqueta">Recibidos</div></div>
     <div class="card"><div class="valor" id="msgOut">0</div><div class="etiqueta">Enviados</div></div>
@@ -932,43 +1073,37 @@ app.get('/', (req, res) => {
     <div class="card"><div class="valor" id="reint">0</div><div class="etiqueta">Reconexiones</div></div>
   </div>
 
-  <div class="seccion-titulo">Cuota de IA hoy</div>
+  <div class="seccion">Cuota de IA hoy (contador interno del bot)</div>
   <div class="grid">
     <div class="card" style="grid-column: 1 / -1">
       <div class="valor" id="cuotaTexto">0 / 0</div>
-      <div class="barra-fondo"><div class="barra-relleno" id="cuotaBarra" style="width:0%"></div></div>
+      <div class="barra-fondo" style="margin-top:14px"><div class="barra-relleno" id="cuotaBarra" style="width:0%"></div></div>
     </div>
   </div>
 
-  <div class="seccion-titulo">Infraestructura</div>
-  <div class="grid">
-    <div class="card"><div class="valor" id="ramUsada">-</div><div class="etiqueta">RAM usada (MB)</div></div>
-    <div class="card"><div class="valor" id="node">-</div><div class="etiqueta">Node.js</div></div>
-    <div class="card"><div class="valor" id="plataforma">-</div><div class="etiqueta">Plataforma</div></div>
-    <div class="card"><div class="valor" id="carga">-</div><div class="etiqueta">Carga promedio</div></div>
-  </div>
+  <div class="seccion" style="margin-top:50px">Comandos disponibles</div>
+  ${generarHtmlComandos()}
 
   <div id="qr"></div>
+
   <script>
     async function actualizar() {
       const r = await fetch('/status');
       const d = await r.json();
       const badge = document.getElementById('badge');
-      const conectadoTexto = d.conectado ? (d.botActivo ? '● CONECTADO' : '● CONECTADO (bot apagado)') : '○ DESCONECTADO';
-      badge.textContent = conectadoTexto;
-      badge.className = 'estado-badge ' + (d.conectado ? 'online' : 'offline');
+      badge.innerHTML = '<div class="dot"></div>' + (d.conectado ? (d.botActivo ? 'CONECTADO' : 'CONECTADO (bot apagado)') : 'DESCONECTADO');
+      badge.className = 'badge ' + (d.conectado ? 'online' : 'offline');
+
       document.getElementById('msgIn').textContent = d.mensajesRecibidos;
       document.getElementById('msgOut').textContent = d.mensajesEnviados;
       document.getElementById('reint').textContent = d.intentosReconexion;
+
       const h = Math.floor(d.uptimeSegundos / 3600), m = Math.floor((d.uptimeSegundos % 3600) / 60), s = d.uptimeSegundos % 60;
       document.getElementById('uptime').textContent = h + 'h ' + m + 'm ' + s + 's';
+
       document.getElementById('cuotaTexto').textContent = d.cuotaUsada + ' / ' + d.cuotaLimite;
       const pct = Math.min(100, Math.round((d.cuotaUsada / d.cuotaLimite) * 100));
       document.getElementById('cuotaBarra').style.width = pct + '%';
-      document.getElementById('ramUsada').textContent = d.infraestructura.ramUsadaMB + ' MB';
-      document.getElementById('node').textContent = d.infraestructura.nodeVersion;
-      document.getElementById('plataforma').textContent = d.infraestructura.plataforma;
-      document.getElementById('carga').textContent = d.infraestructura.cargaPromedio;
     }
     setInterval(actualizar, 3000);
     actualizar();
@@ -978,19 +1113,15 @@ app.get('/', (req, res) => {
 });
 
 app.get('/qr', (req, res) => {
-  if (!estado.ultimoQR) return res.send('<h2 style="font-family:sans-serif">No hay QR pendiente. El bot ya está conectado o aún no se generó uno.</h2>');
-  res.send(`<body style="background:#0d0d0e;display:flex;justify-content:center;align-items:center;height:100vh"><img src="${estado.ultimoQR}" /></body>`);
+  if (!estado.ultimoQR) return res.send('<h2 style="font-family:sans-serif;color:#fff;background:#000;height:100vh;display:flex;align-items:center;justify-content:center">No hay QR pendiente. El bot ya está conectado o aún no se generó uno.</h2>');
+  res.send(`<body style="background:#000;display:flex;justify-content:center;align-items:center;height:100vh"><img src="${estado.ultimoQR}" /></body>`);
 });
 
 app.listen(PUERTO, () => console.log(`🌐 Panel web activo en el puerto ${PUERTO}`));
 
 const URL_PROPIA = process.env.RENDER_EXTERNAL_URL;
 if (URL_PROPIA) {
-  setInterval(() => {
-    fetch(URL_PROPIA)
-      .then(() => console.log('🔁 Auto-ping enviado para mantener el servicio activo'))
-      .catch(err => console.log('⚠️ Auto-ping falló:', err.message));
-  }, 4 * 60 * 1000);
+  setInterval(() => { fetch(URL_PROPIA).catch(() => {}); }, 4 * 60 * 1000);
 }
 
 iniciarBot();
