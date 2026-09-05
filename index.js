@@ -15,15 +15,19 @@ const MODELO_PRINCIPAL = 'gemini-3.6-flash';
 const MODELO_RESPALDO = 'gemini-3.6-flash';
 const MODELO_RESPALDO2 = 'gemini-3.6-flash';
 const MODELO_IMAGEN = process.env.MODELO_IMAGEN || 'gemini-3.1-flash-image';
+const USAR_AVATAR_IA = process.env.USAR_AVATAR_IA === 'true';
 const CODIGO_DUEÑO = '2927760128';
 const NOMBRE_BOT = 'Criss Bot';
 const CREADOR = 'Albert Oficial';
-const VERSION_BOT = '2.01.2';
+const VERSION_BOT = '2.04.0';
 const TU_NUMERO = '51996399291';
 const JID_DUEÑO = `${TU_NUMERO}@s.whatsapp.net`;
 const PUERTO = process.env.PORT || 3000;
 const LIMITE_DIARIO_ESTIMADO = 1400;
-const MAX_TOKENS_RESPUESTA = 500;
+// Bajado de 500 a 350: respuestas un poco más cortas, se generan más rápido.
+const MAX_TOKENS_RESPUESTA = 1500;
+// Tiempo máximo que se espera a cada token de IA antes de saltar al siguiente.
+const TIMEOUT_IA_MS = 9000;
 
 if (!CLAVE_IA_PRINCIPAL) {
   console.log('❌ ALERTA: no se detectó CLAVE_IA_PRINCIPAL en las variables de entorno.');
@@ -34,48 +38,74 @@ if (!CLAVE_IA_RESPALDO) {
 if (!CLAVE_IA_RESPALDO2) {
   console.log('⚠️ Aviso: no se detectó CLAVE_IA_RESPALDO2 (tercer token).');
 }
-// Recuerda: si los 3 tokens vienen del mismo proyecto de Google Cloud, comparten
-// el mismo límite gratis de 20 solicitudes/día por modelo.
 
 const COMANDOS_RESERVADOS = [
-  '/porciento', '/shipeo', '/dado', '/moneda', '/8bola', '/frase', '/ranking',
-  '/kick', '/eliminar', '/sacar', '/ban', '/promover', '/degradar',
-  '/todos', '/everyone', '/cerrar', '/abrir', '/comandos', '/ayuda',
+  '/comando', '/porciento', '/shipeo', '/frase', '/ranking', '/asalto',
+  '/sacar', '/ban', '/promover', '/degradar',
+  '/todos', '/everyone', '/cerrar', '/abrir', '/hablar', '/choro',
   '/meme', '/matrimonio', '/encuesta', '/perfil', '/recordatorio',
-  '/info', '/creador', '/reglas', '/reglaspvp', '/recordar', '/olvidarme'
+  '/info', '/creador', '/reglas', '/reglaspvp', '/recordar', '/olvidarme',
+  '/auditoria', '/movimiento', '/actualizacion'
 ];
 
-const TEXTO_AYUDA = `🤖 *Comandos de ${NOMBRE_BOT}*
+const TEXTO_AYUDA = `📖 *MANUAL DE COMANDOS — ${NOMBRE_BOT}*
 
-🎉 *Diversión*
-/porciento <algo> @usuario — le saca un % random
-/shipeo @user1 @user2 — compatibilidad random
-/matrimonio @user1 @user2 — certificado de boda grupal
-/dado — tira un dado
-/moneda — cara o sello
-/8bola <pregunta> — bola 8 mágica
-/frase — frase random
-/meme — manda un meme en español
-/perfil @usuario — muestra su actividad en el grupo
+━━━━━━━━━━━━━━━━━━
+🧠 *INTELIGENCIA ARTIFICIAL*
+━━━━━━━━━━━━━━━━━━
+▸ /criss <pregunta> — Consulta directa a la IA del bot.
+▸ Mencionar al bot — También activa la IA, sin comando.
+▸ Citar un mensaje + /criss <pregunta> — La IA lee ese mensaje como contexto.
+▸ /recordar — Qué recuerda la IA sobre ti.
+▸ /olvidarme — Elimina tu historial guardado.
 
-👑 *Admin del grupo*
-/kick @usuario — saca del grupo
-/promover @usuario — lo hace admin
-/degradar @usuario — le quita admin
-/todos <mensaje> — etiqueta a todos
-/cerrar / /abrir — solo admins escriben / abre para todos
-/encuesta pregunta; opción1; opción2 — encuesta nativa
-/recordatorio <minutos> <texto> — aviso al grupo
-/ranking — top de más activos
+━━━━━━━━━━━━━━━━━━
+🎉 *ENTRETENIMIENTO*
+━━━━━━━━━━━━━━━━━━
+▸ /porciento <tema> @usuario — Porcentaje aleatorio sobre un tema.
+▸ /shipeo @user1 @user2 — Compatibilidad aleatoria entre dos personas.
+▸ /matrimonio @user1 @user2 — Certificado de boda grupal, en broma.
+▸ /asalto @usuario — Asalto virtual de broma, estilo choro.
+▸ /frase — Frase motivacional aleatoria.
+▸ /meme — Meme en español.
+▸ /perfil @usuario — Actividad del usuario en el grupo.
 
-📋 *Info*
-/info — información del bot
-/creador — quién hizo el bot
-/reglas — reglamento del clan
-/reglaspvp — reglas de PvP
+━━━━━━━━━━━━━━━━━━
+🛡️ *MODERACIÓN* (admins)
+━━━━━━━━━━━━━━━━━━
+▸ /hablar off @usuario — El bot deja de responderle con IA a ese usuario.
+▸ /hablar on @usuario — El bot vuelve a responderle con IA.
+▸ /choro on — Activa la personalidad choro/callejera en este grupo.
+▸ /choro off — Vuelve a la personalidad original.
 
-🧠 *IA*
-Escribe "/criss" seguido de tu pregunta (ej: /criss quien es Leo Dan), o menciona al bot directamente. Recuerda tus conversaciones — usa /recordar o /olvidarme.`;
+━━━━━━━━━━━━━━━━━━
+👑 *ADMINISTRACIÓN* (admins)
+━━━━━━━━━━━━━━━━━━
+▸ /sacar @usuario — Expulsa a un miembro del grupo.
+▸ /promover @usuario — Otorga el rol de administrador.
+▸ /degradar @usuario — Retira el rol de administrador.
+▸ /todos <mensaje> — Envía un aviso etiquetando a todos.
+▸ /cerrar — Solo admins pueden escribir.
+▸ /abrir — Todos los miembros pueden escribir.
+▸ /encuesta <pregunta>; <opción1>; <opción2> — Crea una encuesta nativa.
+▸ /recordatorio <minutos> <mensaje> — Programa un aviso automático.
+▸ /ranking — Miembros más activos.
+▸ /auditoria <cantidad> — Historial de acciones de admins (alias: /movimiento).
+
+━━━━━━━━━━━━━━━━━━
+🗝️ *PROPIETARIO*
+━━━━━━━━━━━━━━━━━━
+▸ /actualizacion criss <describe los cambios> — Publica un anuncio de nueva actualización, redactado por la IA.
+
+━━━━━━━━━━━━━━━━━━
+📋 *INFORMACIÓN*
+━━━━━━━━━━━━━━━━━━
+▸ /info — Estado y versión actual del bot.
+▸ /creador — Quién desarrolló el bot.
+▸ /reglas — Reglamento oficial del clan.
+▸ /reglaspvp — Reglamento oficial de PvP.
+
+Escribe */comando criss* en cualquier momento para ver este manual de nuevo.`;
 
 const PALABRAS_CRISIS = [
   'quiero morir', 'no quiero vivir', 'suicidar', 'suicidio', 'matarme',
@@ -108,22 +138,30 @@ const SAFETY_SETTINGS = [
 const REGLAS_IA_BASE = `
 Eres ${NOMBRE_BOT}, y hablas como si fueras ${CREADOR} mismo respondiéndole a sus panas dentro de un GRUPO de WhatsApp. Personalidad cálida y con onda peruana, cercano, con harta jerga limeña, pero medida — choro y confianzudo, no formal ni acartonado.
 
-CONTEXTO: estás respondiendo dentro de un grupo, puede haber varias personas leyendo.
+CONTEXTO: estás respondiendo dentro de un grupo, puede haber varias personas leyendo. Si la persona citó un mensaje anterior, ese mensaje aparecerá en el contexto adicional — tenlo en cuenta al responder.
 
 INFORMACIÓN SOBRE ${CREADOR}:
-- Es el creador y desarrollador de este bot y de aplicaciones
+- Es el creador, propietario y desarrollador de este bot y de aplicaciones
 - Ingeniero de sistemas
-- Vende archivos para Free Fire: hologramas, aimbot, regedit, archivos data y paneles
+- Su número de propietario es ${TU_NUMERO}
 
 🙏 REGLA SOBRE TU CREADOR: Cuando hables de ${CREADOR}, hazlo SIEMPRE con respeto.
+
+👑 SOBRE TU PROPIETARIO: si el contexto adicional te indica que quien escribe ES tu propietario, trátalo con respeto absoluto y dale prioridad en tu atención, sin perder tu esencia ni volverte acartonado con él.
+
+🎮 SOBRE FREE FIRE: evita sacar el tema de Free Fire o los productos que vende ${CREADOR} por tu cuenta. Solo lo mencionas si alguien te pregunta directamente sobre eso.
+
+📚 NIVEL DE DETALLE: cuando te pregunten algo, da una respuesta completa y útil, no superficial — explica bien lo que haga falta explicar, pero mantente en 3 a 6 líneas salvo que el tema realmente necesite más espacio, sin perder tu personalidad choro y cercana.
 
 ✅ PUEDES: jerga limeña/peruana, garabato suave de vez en cuando (NO en cada respuesta), burla moderada con cariño, emojis con soltura.
 ❌ NUNCA: sonar robot/formal, insultar de verdad, abusar de groserías, meter ventas sin que pregunten.
 
-📏 LARGO: 3 a 6 líneas normalmente, directo y útil, sin relleno.
-
 🚨 CRISIS REAL: si alguien menciona autolesión o suicidio, corta el choreo, responde con calidez genuina y anímalo a hablar con alguien de confianza o profesional.
 `;
+
+const INSTRUCCION_MODO_CHORO = `
+
+🕶️ MODO CHORO ACTIVO EN ESTE GRUPO: sube al máximo la jerga callejera limeña, tono de choro carismático de esquina, picardía y desconfianza juguetona, como un personaje de barrio con mucha labia. Sigue siendo gracioso y sin faltar el respeto de verdad — es un personaje, no maldad real.`;
 
 const MENSAJES_ESPERA = [
   '🤖 Oe, causa... ahorita mi cerebro anda de vacaciones. Dame unos segundos. 😵‍💫',
@@ -174,6 +212,54 @@ function olvidarUsuario(jidUsuario) {
   guardarMemoria();
 }
 
+const ARCHIVO_AUDITORIA = path.join(__dirname, 'auditoria.json');
+function cargarAuditoria() {
+  try { return JSON.parse(fs.readFileSync(ARCHIVO_AUDITORIA, 'utf-8')); }
+  catch (err) { return []; }
+}
+let registroAuditoria = cargarAuditoria();
+let guardadoAuditoriaPendiente = null;
+function guardarAuditoria() {
+  if (guardadoAuditoriaPendiente) clearTimeout(guardadoAuditoriaPendiente);
+  guardadoAuditoriaPendiente = setTimeout(() => {
+    fs.writeFile(ARCHIVO_AUDITORIA, JSON.stringify(registroAuditoria), (err) => {
+      if (err) console.log('⚠️ Error guardando auditoría:', err.message);
+    });
+  }, 2000);
+}
+function registrarAccionAdmin(jidGrupo, tipo, detalle) {
+  registroAuditoria.push({ jidGrupo, tipo, detalle, fecha: new Date().toISOString() });
+  if (registroAuditoria.length > 500) registroAuditoria.shift();
+  guardarAuditoria();
+}
+
+const nombresConocidos = new Map();
+function registrarNombreConocido(jid, nombre) {
+  if (jid && nombre && nombre !== 'amig@') nombresConocidos.set(jid, nombre);
+}
+async function resolverIdentidad(sock, jidGrupo, jidCrudo) {
+  if (!jidCrudo) return 'alguien';
+  let numero = jidCrudo.split('@')[0];
+  try {
+    const metadata = await sock.groupMetadata(jidGrupo);
+    const participante = metadata.participants.find(p => p.id === jidCrudo || p.jid === jidCrudo);
+    if (participante?.phoneNumber) numero = participante.phoneNumber.split('@')[0];
+  } catch (err) {}
+  const nombre = nombresConocidos.get(jidCrudo) || nombresConocidos.get(`${numero}@s.whatsapp.net`);
+  return nombre ? `${nombre} (${numero})` : numero;
+}
+
+const usuariosSilenciados = new Map();
+function estaSilenciado(jidGrupo, jidUsuario) {
+  return usuariosSilenciados.get(jidGrupo)?.has(jidUsuario) || false;
+}
+
+const modoChoroGrupos = new Set();
+
+function esPropietario(jidUsuario) {
+  return jidUsuario.split('@')[0] === TU_NUMERO;
+}
+
 const contadorMensajesGrupo = new Map();
 function registrarMensajeGrupo(jidGrupo, jidUsuario) {
   if (!contadorMensajesGrupo.has(jidGrupo)) contadorMensajesGrupo.set(jidGrupo, new Map());
@@ -220,6 +306,14 @@ function construirClientesIA() {
 }
 const CLIENTES_IA = construirClientesIA();
 
+// Corta la espera si un token tarda demasiado, para no dejar al usuario colgado
+function conTimeout(promesa, ms) {
+  return Promise.race([
+    promesa,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`tiempo de espera agotado (${ms}ms)`)), ms))
+  ]);
+}
+
 async function generarRespuestaIA(prompt, notasExtra) {
   let reglasFinales = REGLAS_IA_BASE;
   if (estiloGlobalExtra) {
@@ -230,27 +324,24 @@ async function generarRespuestaIA(prompt, notasExtra) {
     reglasFinales += `\n\n⚠️ Casi al límite del día — sé un poco más breve de lo normal.`;
   }
 
-  const intentar = async (cliente) => {
-    const res = await cliente.ai.models.generateContent({
-      model: cliente.modelo,
-      contents: prompt,
-      config: { systemInstruction: reglasFinales, safetySettings: SAFETY_SETTINGS, maxOutputTokens: MAX_TOKENS_RESPUESTA }
-    });
-    return res.text;
-  };
+  const intentar = (cliente) => cliente.ai.models.generateContent({
+    model: cliente.modelo,
+    contents: prompt,
+    config: { systemInstruction: reglasFinales, safetySettings: SAFETY_SETTINGS, maxOutputTokens: MAX_TOKENS_RESPUESTA }
+  }).then(res => res.text);
 
   for (const cliente of CLIENTES_IA) {
     try {
-      const r = await intentar(cliente);
+      const r = await conTimeout(intentar(cliente), TIMEOUT_IA_MS);
       registrarUsoIA();
       return r;
     } catch (err) {
-      console.log(`⚠️ Falló IA (${cliente.nombre}):`, err.message);
+      console.log(`⚠️ Falló o tardó IA (${cliente.nombre}):`, err.message);
     }
   }
 
   if (CLIENTES_IA.length > 0) {
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 1200));
     const r = await intentar(CLIENTES_IA[0]);
     registrarUsoIA();
     return r;
@@ -259,7 +350,7 @@ async function generarRespuestaIA(prompt, notasExtra) {
 }
 
 async function generarAvatarIA(numero) {
-  if (CLIENTES_IA.length === 0) return null;
+  if (!USAR_AVATAR_IA || CLIENTES_IA.length === 0) return null;
   try {
     const res = await CLIENTES_IA[0].ai.models.generateContent({
       model: MODELO_IMAGEN,
@@ -272,7 +363,7 @@ async function generarAvatarIA(numero) {
     }
     return null;
   } catch (err) {
-    console.log('⚠️ No se pudo generar avatar con IA (revisa MODELO_IMAGEN):', err.message);
+    console.log('⚠️ No se pudo generar avatar con IA:', err.message);
     return null;
   }
 }
@@ -294,11 +385,21 @@ function esMencionAlBot(msg, texto, identificadoresBot) {
   return identificadoresBot.some(id => texto.includes(`@${id}`));
 }
 
-// Ahora la IA solo se activa con "/criss <pregunta>" o mencionando al bot —
-// ya NO cualquier "/" suelto.
 function debeResponderIA(texto, msg, identificadoresBot) {
   if (esMencionAlBot(msg, texto, identificadoresBot)) return true;
   return /^\/criss\b/i.test(texto.trim());
+}
+
+function obtenerTextoCitado(msg) {
+  const contextInfo = msg.message?.extendedTextMessage?.contextInfo;
+  const citado = contextInfo?.quotedMessage;
+  if (!citado) return null;
+  const texto = citado.conversation
+    || citado.extendedTextMessage?.text
+    || citado.imageMessage?.caption
+    || citado.videoMessage?.caption
+    || null;
+  return texto ? texto.trim() : null;
 }
 
 function normalizarParticipante(participanteRaw) {
@@ -338,14 +439,26 @@ function comandoMatrimonio(mencionados) {
   return { texto, mentions: [a, b] };
 }
 
-function comandoDado() { return Math.floor(Math.random() * 6) + 1; }
-function comandoMoneda() { return Math.random() < 0.5 ? 'Cara 🪙' : 'Sello 🪙'; }
-
-const RESPUESTAS_8BOLA = [
-  'Sí, totalmente 🔮', 'No, ni de a vainas 🙅', 'Puede ser...', 'Pregúntame luego 🕐',
-  'Mmm no está claro 😐', 'Sin duda que sí ✅', 'Yo lo veo difícil 😬', 'Las señales dicen que sí ✨'
+const OBJETOS_ASALTO = [
+  'su estilo de juego', 'su última recarga', 'su fama de gallo del grupo', 'su wifi',
+  'su combo secreto', 'su privacidad en el chat', 'su corona invisible de mejor jugador',
+  'su suerte en las rondas', 'su swag', 'su paciencia'
 ];
-function comando8Bola() { return RESPUESTAS_8BOLA[Math.floor(Math.random() * RESPUESTAS_8BOLA.length)]; }
+const FRASES_ASALTO = [
+  '🔫 ¡Esto es un asalto! @NUM, manos arriba y suelta @OBJ 😎',
+  '🥷 Entrando en silencio total... @NUM no vio venir que le robarían @OBJ 💨',
+  '🎭 Atención al grupo: @NUM acaba de ser "asaltado" y perdió @OBJ 😂',
+  '💰 Asalto exitoso: le sacaron @OBJ a @NUM sin que se diera cuenta 🕶️',
+  '🚨 Alerta de robo en el clan: @NUM se quedó sin @OBJ 😱😂'
+];
+function comandoAsalto(mencionJid) {
+  if (!mencionJid) return { texto: 'Menciona a tu víctima: /asalto @usuario', mentions: [] };
+  const numero = mencionJid.split('@')[0];
+  const objeto = OBJETOS_ASALTO[Math.floor(Math.random() * OBJETOS_ASALTO.length)];
+  const base = FRASES_ASALTO[Math.floor(Math.random() * FRASES_ASALTO.length)];
+  const texto = base.replace('@NUM', `@${numero}`).replace('@OBJ', objeto);
+  return { texto, mentions: [mencionJid] };
+}
 
 const FRASES_RANDOM = [
   'La constancia le gana al talento cuando el talento no es constante 💪',
@@ -428,39 +541,122 @@ async function comandoRanking(sock, jidGrupo) {
 async function esAdminGrupo(sock, jidGrupo, jidUsuario) {
   try {
     const metadata = await sock.groupMetadata(jidGrupo);
-    const participante = metadata.participants.find(p => p.id === jidUsuario);
+    const participante = metadata.participants.find(p =>
+      p.id === jidUsuario || p.phoneNumber === jidUsuario || p.jid === jidUsuario
+    );
     return !!participante && (participante.admin === 'admin' || participante.admin === 'superadmin');
   } catch (err) {
+    console.log('⚠️ Error verificando admin:', err.message);
     return false;
   }
 }
 
 async function comandoPerfil(sock, jidGrupo, jidUsuario, mencionJid) {
-  const jidObjetivo = mencionJid || jidUsuario;
-  const numero = jidObjetivo.split('@')[0];
-  const mapa = contadorMensajesGrupo.get(jidGrupo);
-  const mensajes = mapa?.get(jidObjetivo) || 0;
-  const esAdmin = await esAdminGrupo(sock, jidGrupo, jidObjetivo);
-  const texto = `👤 *Perfil de @${numero}*\n📨 Mensajes en el grupo: ${mensajes}\n👑 Admin: ${esAdmin ? 'Sí' : 'No'}`;
-  await sock.sendMessage(jidGrupo, { text, mentions: [jidObjetivo] });
+  try {
+    const jidObjetivo = mencionJid || jidUsuario;
+    const numero = jidObjetivo.split('@')[0];
+    const mapa = contadorMensajesGrupo.get(jidGrupo);
+    const mensajes = mapa?.get(jidObjetivo) || 0;
+    const esAdmin = await esAdminGrupo(sock, jidGrupo, jidObjetivo);
+    const texto = `👤 *Perfil de @${numero}*\n📨 Mensajes en el grupo: ${mensajes}\n👑 Admin: ${esAdmin ? 'Sí' : 'No'}`;
+    await sock.sendMessage(jidGrupo, { text: texto, mentions: [jidObjetivo] });
+  } catch (err) {
+    console.log('⚠️ Error en /perfil:', err.message);
+    await sock.sendMessage(jidGrupo, { text: 'No pude generar el perfil ahorita, intenta de nuevo 🙏' });
+  }
 }
-async function comandoKick(sock, jidGrupo, jidUsuario, mencionados) {
+
+async function comandoAuditoria(sock, jidGrupo, jidUsuario, cantidadTexto) {
   if (!(await esAdminGrupo(sock, jidGrupo, jidUsuario))) {
-    await sock.sendMessage(jidGrupo, { text: 'Solo los admins del grupo pueden usar este comando causa 🚫' });
+    await sock.sendMessage(jidGrupo, { text: 'Solo los admins pueden ver el registro de movimientos 🚫' });
     return;
   }
-  if (!mencionados.length) {
-    await sock.sendMessage(jidGrupo, { text: 'Menciona a quién quieres sacar: /kick @usuario' });
+  const cantidad = Math.min(Math.max(parseInt(cantidadTexto, 10) || 10, 1), 30);
+  const entradas = registroAuditoria.filter(e => e.jidGrupo === jidGrupo).slice(-cantidad).reverse();
+  if (!entradas.length) {
+    await sock.sendMessage(jidGrupo, { text: '📋 Aún no hay movimientos registrados en este grupo.' });
     return;
   }
+  const ICONOS = { kick: '🚫', add: '➕', promote: '⭐', demote: '🔻', cerrar: '🔒', abrir: '🔓' };
+  const texto = `📋 *REGISTRO DE AUDITORÍA*\n_Últimos ${entradas.length} movimientos_\n\n` +
+    entradas.map(e => {
+      const fecha = new Date(e.fecha).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      return `${ICONOS[e.tipo] || '•'} *${fecha}*\n${e.detalle}`;
+    }).join('\n\n');
+  await sock.sendMessage(jidGrupo, { text: texto });
+}
+
+async function comandoHablar(sock, jidGrupo, jidAdmin, accion, mencionJid) {
+  if (!(await esAdminGrupo(sock, jidGrupo, jidAdmin))) {
+    await sock.sendMessage(jidGrupo, { text: 'Solo los admins pueden silenciar o reactivar a alguien 🚫' });
+    return;
+  }
+  if (!mencionJid) {
+    await sock.sendMessage(jidGrupo, { text: 'Uso: /hablar off @usuario (silenciar) o /hablar on @usuario (reactivar)' });
+    return;
+  }
+  if (!usuariosSilenciados.has(jidGrupo)) usuariosSilenciados.set(jidGrupo, new Set());
+  const set = usuariosSilenciados.get(jidGrupo);
+  const numero = mencionJid.split('@')[0];
+  if (accion === 'off') {
+    set.add(mencionJid);
+    await sock.sendMessage(jidGrupo, { text: `🔇 Listo, ya no le responderé con IA a @${numero}.`, mentions: [mencionJid] });
+  } else if (accion === 'on') {
+    set.delete(mencionJid);
+    await sock.sendMessage(jidGrupo, { text: `🔊 Listo, vuelvo a responderle con IA a @${numero}.`, mentions: [mencionJid] });
+  } else {
+    await sock.sendMessage(jidGrupo, { text: 'Uso: /hablar off @usuario (silenciar) o /hablar on @usuario (reactivar)' });
+  }
+}
+
+async function comandoChoro(sock, jidGrupo, jidAdmin, accion) {
+  if (!(await esAdminGrupo(sock, jidGrupo, jidAdmin))) {
+    await sock.sendMessage(jidGrupo, { text: 'Solo los admins pueden cambiar el modo choro 🚫' });
+    return;
+  }
+  if (accion === 'on') {
+    modoChoroGrupos.add(jidGrupo);
+    await sock.sendMessage(jidGrupo, { text: '😎 Modo CHORO activado en este grupo. Full jerga callejera de ahora en más.' });
+  } else if (accion === 'off') {
+    modoChoroGrupos.delete(jidGrupo);
+    await sock.sendMessage(jidGrupo, { text: '🙌 Modo CHORO desactivado, vuelvo a mi forma normal.' });
+  } else {
+    await sock.sendMessage(jidGrupo, { text: 'Uso: /choro on o /choro off' });
+  }
+}
+
+// Silencioso a propósito: si no es admin o no mencionó a nadie, no dice nada
+// (para no chocar con el otro bot del grupo ni generar ruido innecesario).
+async function comandoSacar(sock, jidGrupo, jidUsuario, mencionados) {
+  if (!(await esAdminGrupo(sock, jidGrupo, jidUsuario))) return;
+  if (!mencionados.length) return;
   try {
     await sock.groupParticipantsUpdate(jidGrupo, mencionados, 'remove');
     await sock.sendMessage(jidGrupo, { text: `👋 Listo, saqué a ${mencionados.length} del grupo.` });
   } catch (err) {
-    await sock.sendMessage(jidGrupo, { text: 'No pude sacarlo, revisa que el bot sea admin del grupo 🙏' });
+    console.log('⚠️ Error en /sacar:', err.message);
   }
 }
 
+async function comandoActualizacion(sock, jidGrupo, jidUsuario, descripcion) {
+  if (!esPropietario(jidUsuario)) {
+    await sock.sendMessage(jidGrupo, { text: 'Solo el propietario puede publicar actualizaciones del bot 🚫' });
+    return;
+  }
+  if (!descripcion) {
+    await sock.sendMessage(jidGrupo, { text: 'Uso: /actualizacion criss <describe las nuevas funciones>' });
+    return;
+  }
+  try {
+    const prompt = `Redacta un anuncio emocionante y claro para un grupo de WhatsApp, anunciando una actualización del bot ${NOMBRE_BOT}. Estas son las novedades, en palabras del creador: "${descripcion}". Resalta el beneficio para los usuarios del grupo, en 4 a 8 líneas, con emojis, sin inventar funciones que no se mencionaron aquí.`;
+    const anuncio = await generarRespuestaIA(prompt, null);
+    const textoFinal = `📢 *ACTUALIZACIÓN DEL BOT*\n\n${anuncio}\n\n> Albert Drak`;
+    await sock.sendMessage(jidGrupo, { text: textoFinal });
+  } catch (err) {
+    console.log('⚠️ Error en /actualizacion:', err.message);
+    await sock.sendMessage(jidGrupo, { text: 'No pude generar el anuncio ahorita, intenta de nuevo 🙏' });
+  }
+}
 async function comandoPromoverDegradar(sock, jidGrupo, jidUsuario, mencionados, accion) {
   if (!(await esAdminGrupo(sock, jidGrupo, jidUsuario))) {
     await sock.sendMessage(jidGrupo, { text: 'Solo los admins pueden usar este comando 🚫' });
@@ -502,6 +698,8 @@ async function comandoCerrarGrupo(sock, jidGrupo, jidUsuario, cerrar) {
   try {
     await sock.groupSettingUpdate(jidGrupo, cerrar ? 'announcement' : 'not_announcement');
     await sock.sendMessage(jidGrupo, { text: cerrar ? '🔒 Grupo cerrado, solo admins escriben.' : '🔓 Grupo abierto para todos.' });
+    const autorMostrar = await resolverIdentidad(sock, jidGrupo, jidUsuario);
+    registrarAccionAdmin(jidGrupo, cerrar ? 'cerrar' : 'abrir', `${autorMostrar} ${cerrar ? 'cerró' : 'abrió'} el grupo (cambio de ajustes)`);
   } catch (err) {
     await sock.sendMessage(jidGrupo, { text: 'No pude cambiar la configuración, revisa que el bot sea admin.' });
   }
@@ -515,7 +713,7 @@ function generarTextoInfo() {
 🟢 Estado: ${estado.conectado ? 'Conectado y activo' : 'Desconectado'}
 ⏱ Tiempo activo: ${uptimeH}h
 
-Escribe /comandos para ver todo lo que puedo hacer.`;
+Escribe /comando criss para ver todo lo que puedo hacer.`;
 }
 
 const TEXTO_CREADOR = `👑 Este bot fue creado por *Albert Oficial*, desarrollador de bots de WhatsApp y aplicaciones. 🙌`;
@@ -676,6 +874,7 @@ async function procesarMensajeGrupo(sock, msg, identificadoresBot) {
   if (!texto) return;
 
   registrarMensajeGrupo(jidGrupo, jidUsuario);
+  registrarNombreConocido(jidUsuario, nombreContacto);
 
   if (esIntencionCompra(texto)) {
     try {
@@ -693,6 +892,18 @@ async function procesarMensajeGrupo(sock, msg, identificadoresBot) {
 
   try {
     switch (comando) {
+      case '/comando': {
+        if ((resto[0] || '').toLowerCase() === 'criss') {
+          await sock.sendMessage(jidGrupo, { text: TEXTO_AYUDA });
+        }
+        return;
+      }
+      case '/actualizacion': {
+        if ((resto[0] || '').toLowerCase() !== 'criss') return;
+        const descripcion = resto.slice(1).join(' ');
+        await comandoActualizacion(sock, jidGrupo, jidUsuario, descripcion);
+        return;
+      }
       case '/porciento': {
         const { texto: t, mentions } = comandoPorciento(tipo, mencionados[0]);
         await sock.sendMessage(jidGrupo, { text: t, mentions });
@@ -709,9 +920,11 @@ async function procesarMensajeGrupo(sock, msg, identificadoresBot) {
         await sock.sendMessage(jidGrupo, { text: t, mentions });
         return;
       }
-      case '/dado': await sock.sendMessage(jidGrupo, { text: `🎲 Salió: ${comandoDado()}` }); return;
-      case '/moneda': await sock.sendMessage(jidGrupo, { text: `🪙 ${comandoMoneda()}` }); return;
-      case '/8bola': await sock.sendMessage(jidGrupo, { text: `🔮 ${comando8Bola()}` }); return;
+      case '/asalto': {
+        const { texto: t, mentions } = comandoAsalto(mencionados[0]);
+        await sock.sendMessage(jidGrupo, { text: t, mentions });
+        return;
+      }
       case '/frase': await sock.sendMessage(jidGrupo, { text: comandoFrase() }); return;
       case '/meme': await comandoMeme(sock, jidGrupo); return;
       case '/encuesta': await comandoEncuesta(sock, jidGrupo, resto.join(' ')); return;
@@ -721,8 +934,14 @@ async function procesarMensajeGrupo(sock, msg, identificadoresBot) {
         await sock.sendMessage(jidGrupo, { text: t, mentions });
         return;
       }
-      case '/kick': case '/eliminar': case '/sacar': case '/ban':
-        await comandoKick(sock, jidGrupo, jidUsuario, mencionados); return;
+      case '/auditoria': case '/movimiento':
+        await comandoAuditoria(sock, jidGrupo, jidUsuario, resto[0]); return;
+      case '/hablar':
+        await comandoHablar(sock, jidGrupo, jidUsuario, (resto[0] || '').toLowerCase(), mencionados[0]); return;
+      case '/choro':
+        await comandoChoro(sock, jidGrupo, jidUsuario, (resto[0] || '').toLowerCase()); return;
+      case '/sacar': case '/ban':
+        await comandoSacar(sock, jidGrupo, jidUsuario, mencionados); return;
       case '/promover': await comandoPromoverDegradar(sock, jidGrupo, jidUsuario, mencionados, 'promote'); return;
       case '/degradar': await comandoPromoverDegradar(sock, jidGrupo, jidUsuario, mencionados, 'demote'); return;
       case '/todos': case '/everyone': await comandoTodos(sock, jidGrupo, jidUsuario, resto.join(' ')); return;
@@ -753,12 +972,13 @@ async function procesarMensajeGrupo(sock, msg, identificadoresBot) {
         await sock.sendMessage(jidGrupo, { text: 'Listo, borré todo lo que recordaba de ti 🗑️' });
         return;
       }
-      case '/comandos': case '/ayuda': await sock.sendMessage(jidGrupo, { text: TEXTO_AYUDA }); return;
     }
   } catch (err) {
     console.log('❌ Error en comando:', err.message);
     return;
   }
+
+  if (estaSilenciado(jidGrupo, jidUsuario)) return;
 
   if (!debeResponderIA(texto, msg, identificadoresBot)) return;
 
@@ -770,7 +990,17 @@ async function procesarMensajeGrupo(sock, msg, identificadoresBot) {
 
   try {
     const consultaLimpia = texto.replace(/@\d+/g, '').replace(/^\/criss\s*/i, '').trim() || texto;
-    const notas = `Mensaje de ${nombreContacto} dentro de un grupo de WhatsApp, hay más personas leyendo.` + obtenerContextoCorto(jidUsuario);
+    const textoCitado = obtenerTextoCitado(msg);
+    let notas = `Mensaje de ${nombreContacto} dentro de un grupo de WhatsApp, hay más personas leyendo.` + obtenerContextoCorto(jidUsuario);
+    if (textoCitado) {
+      notas += `\n\nEsta persona citó (respondió a) un mensaje anterior que decía: "${textoCitado}". Ten esto en cuenta al responder, puede ser el tema de su pregunta.`;
+    }
+    if (esPropietario(jidUsuario)) {
+      notas += `\n\nIMPORTANTE: quien te escribe ahora ES tu propietario/creador. Trátalo con máximo respeto y prioridad.`;
+    }
+    if (modoChoroGrupos.has(jidGrupo)) {
+      notas += INSTRUCCION_MODO_CHORO;
+    }
     const respuesta = await generarRespuestaIA(consultaLimpia, notas);
     await enviarRespuestaHumanizada(sock, jidGrupo, respuesta, [jidUsuario]);
     agregarAMemoriaCorta(jidUsuario, texto, respuesta);
@@ -783,11 +1013,15 @@ async function procesarMensajeGrupo(sock, msg, identificadoresBot) {
 function registrarBienvenidasYDespedidas(sock) {
   sock.ev.on('group-participants.update', async (evento) => {
     console.log('📥 Evento de participantes recibido:', evento.action);
-    const { id: jidGrupo, participants, action } = evento;
+    const { id: jidGrupo, participants, action, author } = evento;
+    const autorMostrar = author ? await resolverIdentidad(sock, jidGrupo, author) : 'un admin';
+
     for (const participanteRaw of participants) {
       const { jid: jidParticipante, numero } = normalizarParticipante(participanteRaw);
       if (!jidParticipante) { console.log('⚠️ Participante sin jid válido, se omite:', participanteRaw); continue; }
       try {
+        const objetivoMostrar = await resolverIdentidad(sock, jidGrupo, jidParticipante);
+
         if (action === 'add') {
           let fotoUrl = null;
           try { fotoUrl = await sock.profilePictureUrl(jidParticipante, 'image'); } catch (err) { fotoUrl = null; }
@@ -805,12 +1039,18 @@ function registrarBienvenidasYDespedidas(sock) {
               await sock.sendMessage(jidGrupo, { image: { url: fotoRespaldo }, caption: texto, mentions: [jidParticipante] });
             }
           }
+          registrarAccionAdmin(jidGrupo, 'add', `${autorMostrar} agregó a ${objetivoMostrar} al grupo`);
         } else if (action === 'remove') {
           await sock.sendMessage(jidGrupo, { text: comandoDespedidaAleatoria(numero), mentions: [jidParticipante] });
+          if (author && author !== jidParticipante) {
+            registrarAccionAdmin(jidGrupo, 'kick', `${autorMostrar} sacó a ${objetivoMostrar} del grupo`);
+          }
         } else if (action === 'promote') {
           await sock.sendMessage(jidGrupo, { text: `⭐ @${numero} ahora es admin del grupo.`, mentions: [jidParticipante] });
+          registrarAccionAdmin(jidGrupo, 'promote', `${autorMostrar} le dio admin a ${objetivoMostrar}`);
         } else if (action === 'demote') {
           await sock.sendMessage(jidGrupo, { text: `🔻 @${numero} ya no es admin.`, mentions: [jidParticipante] });
+          registrarAccionAdmin(jidGrupo, 'demote', `${autorMostrar} le quitó admin a ${objetivoMostrar}`);
         }
       } catch (err) {
         console.log('⚠️ Error en bienvenida/despedida:', err.message);
@@ -931,49 +1171,58 @@ setInterval(async () => {
   }
 }, 30 * 1000);
 const LISTA_COMANDOS_PANEL = [
-  { cat: '🎉 Diversión', items: [
-    ['/porciento &lt;algo&gt; @user', 'Le saca un % random'],
-    ['/shipeo @user1 @user2', 'Compatibilidad random'],
-    ['/matrimonio @user1 @user2', 'Certificado de boda grupal'],
-    ['/dado', 'Tira un dado'],
-    ['/moneda', 'Cara o sello'],
-    ['/8bola &lt;pregunta&gt;', 'Bola 8 mágica'],
-    ['/frase', 'Frase random'],
-    ['/meme', 'Meme en español'],
-    ['/perfil @user', 'Actividad en el grupo']
+  { cat: 'INTELIGENCIA ARTIFICIAL', items: [
+    ['/criss <pregunta>', 'consulta directa a la IA'],
+    ['@bot <pregunta>', 'mencionar al bot activa la IA'],
+    ['citar + /criss', 'la IA lee el mensaje citado'],
+    ['/recordar', 'ver que recuerda la IA de ti'],
+    ['/olvidarme', 'borra tu historial guardado']
   ]},
-  { cat: '👑 Admin', items: [
-    ['/kick @user', 'Saca del grupo'],
-    ['/promover @user', 'Lo hace admin'],
-    ['/degradar @user', 'Le quita admin'],
-    ['/todos &lt;msj&gt;', 'Etiqueta a todos'],
-    ['/cerrar · /abrir', 'Controla quién escribe'],
-    ['/encuesta preg; op1; op2', 'Encuesta nativa'],
-    ['/recordatorio &lt;min&gt; &lt;texto&gt;', 'Aviso al grupo'],
-    ['/ranking', 'Top de más activos']
+  { cat: 'ENTRETENIMIENTO', items: [
+    ['/porciento <tema> @user', 'porcentaje aleatorio'],
+    ['/shipeo @user1 @user2', 'compatibilidad aleatoria'],
+    ['/matrimonio @user1 @user2', 'boda grupal en broma'],
+    ['/asalto @user', 'asalto virtual de broma'],
+    ['/frase', 'frase motivacional'],
+    ['/meme', 'meme en español'],
+    ['/perfil @user', 'actividad del usuario']
   ]},
-  { cat: '📋 Info', items: [
-    ['/info', 'Info del bot'],
-    ['/creador', 'Quién lo hizo'],
-    ['/reglas', 'Reglamento del clan'],
-    ['/reglaspvp', 'Reglas de PvP']
+  { cat: 'MODERACION', items: [
+    ['/hablar off @user', 'la IA deja de responderle'],
+    ['/hablar on @user', 'la IA vuelve a responderle'],
+    ['/choro on', 'activa personalidad choro'],
+    ['/choro off', 'vuelve a la normalidad']
   ]},
-  { cat: '🧠 IA', items: [
-    ['/criss &lt;pregunta&gt;', 'Pregúntale a la IA'],
-    ['@bot &lt;pregunta&gt;', 'Mencionando al bot'],
-    ['/recordar', 'Ver qué recuerda de ti'],
-    ['/olvidarme', 'Borra su memoria de ti']
+  { cat: 'ADMINISTRACION', items: [
+    ['/sacar @user', 'expulsa a un miembro'],
+    ['/promover @user', 'otorga rol de admin'],
+    ['/degradar @user', 'retira rol de admin'],
+    ['/todos <msj>', 'etiqueta a todos'],
+    ['/cerrar . /abrir', 'controla quien escribe'],
+    ['/encuesta preg; op1; op2', 'encuesta nativa'],
+    ['/recordatorio <min> <texto>', 'aviso automatico'],
+    ['/ranking', 'miembros mas activos'],
+    ['/auditoria <cant>', 'historial de acciones']
+  ]},
+  { cat: 'PROPIETARIO', items: [
+    ['/actualizacion criss <texto>', 'publica un anuncio de actualizacion']
+  ]},
+  { cat: 'INFORMACION', items: [
+    ['/info', 'estado y version del bot'],
+    ['/creador', 'quien desarrollo el bot'],
+    ['/reglas', 'reglamento del clan'],
+    ['/reglaspvp', 'reglamento de pvp']
   ]}
 ];
 
 function generarHtmlComandos() {
   return LISTA_COMANDOS_PANEL.map(grupo => `
-    <div class="cat-titulo">${grupo.cat}</div>
+    <div class="cat-titulo">[ ${grupo.cat} ]</div>
     <div class="cmd-grid">
       ${grupo.items.map(([nombre, desc]) => `
         <div class="cmd-card">
-          <div class="cmd-nombre">${nombre}</div>
-          <div class="cmd-desc">${desc}</div>
+          <span class="prompt">$</span> <span class="cmd-nombre">${nombre}</span>
+          <div class="cmd-desc"># ${desc}</div>
         </div>
       `).join('')}
     </div>
@@ -981,6 +1230,7 @@ function generarHtmlComandos() {
 }
 
 const app = express();
+app.use(express.json());
 
 app.get('/status', (req, res) => {
   res.json({
@@ -988,100 +1238,127 @@ app.get('/status', (req, res) => {
     uptimeSegundos: Math.floor((Date.now() - estado.inicio) / 1000),
     mensajesRecibidos: estado.mensajesRecibidos, mensajesEnviados: estado.mensajesEnviados,
     intentosReconexion: estado.intentosReconexion,
-    cuotaUsada: contadorCuota.usados, cuotaLimite: LIMITE_DIARIO_ESTIMADO
+    cuotaUsada: contadorCuota.usados, cuotaLimite: LIMITE_DIARIO_ESTIMADO,
+    urlRender: process.env.RENDER_EXTERNAL_URL || null,
+    version: VERSION_BOT
   });
 });
 
+app.post('/panel/toggle', (req, res) => {
+  const { clave, activar } = req.body || {};
+  if (clave !== CODIGO_DUEÑO) {
+    return res.status(401).json({ ok: false, mensaje: 'Código incorrecto' });
+  }
+  botActivo = !!activar;
+  res.json({ ok: true, botActivo });
+});
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>${NOMBRE_BOT} · Panel</title>
+<title>${NOMBRE_BOT} :: TERMINAL</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Mono&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
-    background: radial-gradient(circle at 20% 0%, #10041f 0%, #000000 55%, #000000 100%);
-    color: #d7e6ff; font-family: 'Space Mono', monospace; min-height: 100vh;
-    display: flex; flex-direction: column; align-items: center; padding: 50px 20px 70px;
-    overflow-x: hidden;
+    background: #000; color: #00ff41; font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh; padding: 30px 18px 70px; position: relative; overflow-x: hidden;
   }
-  h1 {
-    font-family: 'Orbitron', sans-serif; font-weight: 900; font-size: 42px; letter-spacing: 8px;
-    background: linear-gradient(90deg, #00f7ff, #a24bff, #ff2ee6, #00f7ff);
-    background-size: 300% auto; -webkit-background-clip: text; background-clip: text; color: transparent;
-    animation: brillo 6s linear infinite; text-align: center;
+  body::before {
+    content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 2;
+    background: repeating-linear-gradient(0deg, rgba(0,255,65,0.03) 0px, rgba(0,255,65,0.03) 1px, transparent 1px, transparent 3px);
   }
-  @keyframes brillo { to { background-position: 300% center; } }
-  .sub { color: #7d8bb5; font-size: 12px; letter-spacing: 3px; margin: 6px 0 34px; text-transform: uppercase; }
-  .badge {
-    padding: 10px 26px; border-radius: 30px; font-family: 'Orbitron', sans-serif; font-weight: 700;
-    font-size: 13px; letter-spacing: 2px; display: flex; align-items: center; gap: 10px; margin-bottom: 34px;
+  .terminal-header { border: 1px solid #00ff41; padding: 14px 18px; margin-bottom: 20px; }
+  .terminal-header .linea1 { font-size: 20px; letter-spacing: 3px; }
+  .terminal-header .linea1::before { content: '> '; }
+  .terminal-header .linea2 { font-size: 11px; color: #0a8f2c; margin-top: 6px; }
+  .cursor { display: inline-block; width: 8px; height: 14px; background: #00ff41; animation: parpadeo 1s step-end infinite; vertical-align: middle; margin-left: 4px; }
+  @keyframes parpadeo { 50% { opacity: 0; } }
+
+  .badge { display: inline-flex; align-items: center; gap: 8px; border: 1px solid #00ff41; padding: 6px 16px; font-size: 12px; margin-bottom: 20px; }
+  .badge.off { border-color: #ff2b2b; color: #ff2b2b; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #00ff41; box-shadow: 0 0 6px #00ff41; animation: parpadeo 1.2s infinite; }
+  .badge.off .dot { background: #ff2b2b; box-shadow: 0 0 6px #ff2b2b; }
+
+  .seccion { font-size: 12px; color: #0a8f2c; margin: 24px 0 10px; letter-spacing: 2px; }
+  .seccion::before { content: '## '; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; max-width: 900px; }
+  .card { border: 1px solid #0a8f2c; padding: 14px; text-align: center; background: rgba(0,255,65,0.02); }
+  .card .valor { font-size: 22px; font-weight: bold; }
+  .card .etiqueta { font-size: 10px; color: #0a8f2c; margin-top: 4px; }
+
+  .barra-fondo { max-width: 900px; height: 12px; border: 1px solid #0a8f2c; margin-top: 10px; overflow: hidden; }
+  .barra-relleno { height: 100%; background: #00ff41; }
+
+  .panel-control { max-width: 900px; border: 1px solid #00ff41; padding: 18px; }
+  .panel-control p { font-size: 11px; color: #0a8f2c; margin-bottom: 12px; }
+  .panel-control input {
+    width: 100%; padding: 10px; background: #000; border: 1px solid #0a8f2c; color: #00ff41;
+    font-family: 'Share Tech Mono', monospace; margin-bottom: 12px;
   }
-  .dot { width: 10px; height: 10px; border-radius: 50%; }
-  .online { background: rgba(0,255,170,0.08); border: 1px solid #00ffaa; color: #00ffaa; }
-  .online .dot { background: #00ffaa; box-shadow: 0 0 10px #00ffaa; animation: pulso 1.4s infinite; }
-  .offline { background: rgba(255,60,90,0.08); border: 1px solid #ff3c5a; color: #ff3c5a; }
-  .offline .dot { background: #ff3c5a; box-shadow: 0 0 10px #ff3c5a; }
-  @keyframes pulso { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
-
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px; width: 100%; max-width: 900px; }
-  .card {
-    background: linear-gradient(160deg, rgba(20,10,40,0.8), rgba(5,5,15,0.9));
-    border: 1px solid rgba(160,90,255,0.25); border-radius: 14px; padding: 20px; text-align: center;
-    box-shadow: 0 0 20px rgba(120,60,255,0.06); transition: transform .2s, box-shadow .2s;
+  .panel-control .botones { display: flex; gap: 10px; }
+  .panel-control button {
+    flex: 1; padding: 10px; background: #000; border: 1px solid #00ff41; color: #00ff41;
+    font-family: 'Share Tech Mono', monospace; cursor: pointer; letter-spacing: 1px;
   }
-  .card:hover { transform: translateY(-3px); box-shadow: 0 0 24px rgba(160,80,255,0.25); }
-  .card .valor { font-family: 'Orbitron', sans-serif; font-size: 26px; color: #f2f6ff; font-weight: 700; }
-  .card .etiqueta { font-size: 10px; color: #8a97c2; margin-top: 8px; text-transform: uppercase; letter-spacing: 1.5px; }
+  .panel-control button.off { border-color: #ff2b2b; color: #ff2b2b; }
+  .panel-control button:hover { background: rgba(0,255,65,0.1); }
+  #mensajeControl { font-size: 11px; margin-top: 10px; color: #0a8f2c; }
 
-  .seccion { margin-top: 40px; margin-bottom: 14px; font-family: 'Orbitron', sans-serif; font-size: 13px;
-    letter-spacing: 3px; color: #a86bff; text-transform: uppercase; align-self: flex-start;
-    max-width: 900px; width: 100%; }
+  .render-link { display: inline-block; margin-top: 24px; padding: 8px 18px; border: 1px solid #00ff41; color: #00ff41; text-decoration: none; font-size: 12px; }
 
-  .barra-fondo { width: 100%; max-width: 900px; height: 16px; background: rgba(255,255,255,0.05);
-    border-radius: 10px; overflow: hidden; border: 1px solid rgba(160,90,255,0.2); }
-  .barra-relleno { height: 100%; background: linear-gradient(90deg, #00f7ff, #a24bff); box-shadow: 0 0 10px #a24bff; }
+  .cat-titulo { font-size: 12px; color: #00ff41; margin: 20px 0 8px; letter-spacing: 2px; max-width: 900px; }
+  .cmd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; max-width: 900px; }
+  .cmd-card { border: 1px solid #0a8f2c; padding: 10px 14px; font-size: 12px; }
+  .prompt { color: #00ff41; font-weight: bold; }
+  .cmd-nombre { color: #d5ffe0; }
+  .cmd-desc { color: #0a8f2c; margin-top: 3px; font-size: 11px; }
 
-  .cat-titulo { font-family: 'Orbitron', sans-serif; font-size: 14px; letter-spacing: 2px; color: #ff2ee6;
-    margin: 26px 0 12px; text-transform: uppercase; width: 100%; max-width: 900px; }
-  .cmd-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;
-    width: 100%; max-width: 900px; }
-  .cmd-card { background: rgba(15,8,30,0.7); border: 1px solid rgba(0,247,255,0.2); border-radius: 10px;
-    padding: 12px 16px; transition: border-color .2s, box-shadow .2s; }
-  .cmd-card:hover { border-color: #00f7ff; box-shadow: 0 0 14px rgba(0,247,255,0.25); }
-  .cmd-nombre { font-family: 'Orbitron', sans-serif; font-size: 12px; color: #00f7ff; letter-spacing: 1px; }
-  .cmd-desc { font-size: 11px; color: #9aa4c9; margin-top: 4px; }
-
-  #qr { margin-top: 30px; }
-  #qr img { border-radius: 14px; border: 2px solid rgba(160,90,255,0.4); box-shadow: 0 0 30px rgba(160,90,255,0.3); }
+  #qr { margin-top: 24px; }
+  #qr img { border: 1px solid #00ff41; }
 </style>
 </head>
 <body>
-  <h1>${NOMBRE_BOT.toUpperCase()}</h1>
-  <div class="sub">Panel de control · ${CREADOR}</div>
-  <div id="badge" class="badge offline"><div class="dot"></div>Cargando...</div>
-
-  <div class="seccion">Actividad</div>
-  <div class="grid">
-    <div class="card"><div class="valor" id="msgIn">0</div><div class="etiqueta">Recibidos</div></div>
-    <div class="card"><div class="valor" id="msgOut">0</div><div class="etiqueta">Enviados</div></div>
-    <div class="card"><div class="valor" id="uptime">0s</div><div class="etiqueta">Uptime</div></div>
-    <div class="card"><div class="valor" id="reint">0</div><div class="etiqueta">Reconexiones</div></div>
+  <div class="terminal-header">
+    <div class="linea1">${NOMBRE_BOT.toUpperCase()}_SYSTEM<span class="cursor"></span></div>
+    <div class="linea2">root@render:~$ panel de control · propietario: ${CREADOR} · v${VERSION_BOT}</div>
   </div>
 
-  <div class="seccion">Cuota de IA hoy (contador interno del bot)</div>
+  <div id="badge" class="badge off"><div class="dot"></div>INICIALIZANDO...</div>
+
+  <div class="seccion">actividad_del_sistema</div>
+  <div class="grid">
+    <div class="card"><div class="valor" id="msgIn">0</div><div class="etiqueta">recibidos</div></div>
+    <div class="card"><div class="valor" id="msgOut">0</div><div class="etiqueta">enviados</div></div>
+    <div class="card"><div class="valor" id="uptime">0s</div><div class="etiqueta">uptime</div></div>
+    <div class="card"><div class="valor" id="reint">0</div><div class="etiqueta">reconexiones</div></div>
+  </div>
+
+  <div class="seccion">cuota_ia_diaria</div>
   <div class="grid">
     <div class="card" style="grid-column: 1 / -1">
       <div class="valor" id="cuotaTexto">0 / 0</div>
-      <div class="barra-fondo" style="margin-top:14px"><div class="barra-relleno" id="cuotaBarra" style="width:0%"></div></div>
+      <div class="barra-fondo"><div class="barra-relleno" id="cuotaBarra" style="width:0%"></div></div>
     </div>
   </div>
 
-  <div class="seccion" style="margin-top:50px">Comandos disponibles</div>
+  <div class="seccion">control_remoto</div>
+  <div class="panel-control">
+    <p>&gt; ingresa el codigo de acceso para ejecutar comandos de sistema</p>
+    <input id="claveControl" type="password" placeholder="codigo_de_acceso">
+    <div class="botones">
+      <button onclick="controlarBot(true)">[ ENCENDER ]</button>
+      <button class="off" onclick="controlarBot(false)">[ APAGAR ]</button>
+    </div>
+    <p id="mensajeControl"></p>
+  </div>
+
+  <div id="linkRenderCont"></div>
+
+  <div class="seccion" style="margin-top:34px">lista_de_comandos</div>
   ${generarHtmlComandos()}
 
   <div id="qr"></div>
@@ -1091,8 +1368,8 @@ app.get('/', (req, res) => {
       const r = await fetch('/status');
       const d = await r.json();
       const badge = document.getElementById('badge');
-      badge.innerHTML = '<div class="dot"></div>' + (d.conectado ? (d.botActivo ? 'CONECTADO' : 'CONECTADO (bot apagado)') : 'DESCONECTADO');
-      badge.className = 'badge ' + (d.conectado ? 'online' : 'offline');
+      badge.innerHTML = '<div class="dot"></div>' + (d.conectado ? (d.botActivo ? 'STATUS: ONLINE' : 'STATUS: ONLINE (BOT PAUSADO)') : 'STATUS: OFFLINE');
+      badge.className = 'badge ' + (d.conectado ? '' : 'off');
 
       document.getElementById('msgIn').textContent = d.mensajesRecibidos;
       document.getElementById('msgOut').textContent = d.mensajesEnviados;
@@ -1104,6 +1381,28 @@ app.get('/', (req, res) => {
       document.getElementById('cuotaTexto').textContent = d.cuotaUsada + ' / ' + d.cuotaLimite;
       const pct = Math.min(100, Math.round((d.cuotaUsada / d.cuotaLimite) * 100));
       document.getElementById('cuotaBarra').style.width = pct + '%';
+
+      const contLink = document.getElementById('linkRenderCont');
+      if (d.urlRender && !contLink.dataset.hecho) {
+        contLink.innerHTML = '<a class="render-link" href="' + d.urlRender + '" target="_blank">&gt; ' + d.urlRender + '</a>';
+        contLink.dataset.hecho = '1';
+      }
+    }
+    async function controlarBot(activar) {
+      const clave = document.getElementById('claveControl').value;
+      const msgEl = document.getElementById('mensajeControl');
+      msgEl.textContent = '> ejecutando...';
+      try {
+        const r = await fetch('/panel/toggle', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clave, activar })
+        });
+        const d = await r.json();
+        msgEl.textContent = d.ok ? ('> ok: bot ' + (activar ? 'encendido' : 'apagado')) : ('> error: ' + d.mensaje);
+        if (d.ok) actualizar();
+      } catch (err) {
+        msgEl.textContent = '> error: fallo de conexion con el servidor';
+      }
     }
     setInterval(actualizar, 3000);
     actualizar();
@@ -1113,7 +1412,7 @@ app.get('/', (req, res) => {
 });
 
 app.get('/qr', (req, res) => {
-  if (!estado.ultimoQR) return res.send('<h2 style="font-family:sans-serif;color:#fff;background:#000;height:100vh;display:flex;align-items:center;justify-content:center">No hay QR pendiente. El bot ya está conectado o aún no se generó uno.</h2>');
+  if (!estado.ultimoQR) return res.send('<body style="background:#000;color:#00ff41;font-family:monospace;display:flex;align-items:center;justify-content:center;height:100vh">&gt; No hay QR pendiente. El bot ya está conectado o aún no se generó uno.</body>');
   res.send(`<body style="background:#000;display:flex;justify-content:center;align-items:center;height:100vh"><img src="${estado.ultimoQR}" /></body>`);
 });
 

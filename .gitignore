@@ -8,3 +8,4 @@ bot.lock
 db.json
 usuarios.json
 datos/
+sesion/
