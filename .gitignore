@@ -9,3 +9,6 @@ db.json
 usuarios.json
 datos/
 sesion/
+sesion/
+node_modules/
+.env
